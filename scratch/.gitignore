@@ -3,5 +3,6 @@
 !.gitignore
 
 !subdir/
+!handover-ns3-works/
 !scratch-simulator.cc
 !CMakeLists.txt

@@ -105,7 +105,7 @@ RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, ui
 int
 main(int argc, char* argv[])
 {
-    // LogLevel logLevel = (LogLevel)(LOG_PREFIX_ALL | LOG_LEVEL_ALL);
+		Time::SetResolution(Time::US);
 
     // LogComponentEnable ("LteHelper", LOG_LEVEL_ALL);
     // LogComponentEnable ("PropagationLossModel", LOG_LEVEL_ALL);
@@ -255,7 +255,7 @@ main(int argc, char* argv[])
     MobilityHelper ueMobility;
     ueMobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
     ueMobility.Install(ueNodes);
-    ueNodes.Get(0)->GetObject<MobilityModel>()->SetPosition(Vector(0, yForUe, 0));
+    ueNodes.Get(0)->GetObject<MobilityModel>()->SetPosition(Vector(-100, yForUe, 0));
     ueNodes.Get(0)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(speed, 0, 0));
 
     // Install LTE Devices in eNB and UEs

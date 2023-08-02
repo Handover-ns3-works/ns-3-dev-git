@@ -670,6 +670,10 @@ LteUePhy::GenerateCqiRsrpRsrq(const SpectrumValue& sinr)
             NS_ASSERT(rbNum == (*itPss).nRB);
             double rsrq_dB = 10 * log10((*itPss).pssPsdSum / rssiSum);
 
+						// print the RSSI and RSRQ values in db
+						std::cout << Simulator::Now().GetSeconds() << ", " << m_cellId << ", 0, 0, "
+							<< 10 * log10(rssiSum) << ", " << rsrq_dB << ", 0" << std::endl;
+						
             if (rsrq_dB > m_pssReceptionThreshold)
             {
                 NS_LOG_INFO(this << " PSS RNTI " << m_rnti << " cellId " << m_cellId << " has RSRQ "

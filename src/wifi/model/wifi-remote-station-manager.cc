@@ -390,11 +390,9 @@ WifiRemoteStationManager::AddAllSupportedMcs(Mac48Address address)
     NS_LOG_FUNCTION(this << address);
     NS_ASSERT(!address.IsGroup());
     auto state = LookupState(address);
-    state->m_operationalMcsSet.clear();
-    for (const auto& mcs : m_wifiPhy->GetMcsList())
-    {
-        state->m_operationalMcsSet.push_back(mcs);
-    }
+
+    const auto& mcsList = m_wifiPhy->GetMcsList();
+    state->m_operationalMcsSet = WifiModeList(mcsList.begin(), mcsList.end());
 }
 
 void
@@ -647,7 +645,7 @@ WifiRemoteStationManager::GetDataTxVector(const WifiMacHeader& header, uint16_t 
     {
         txVector = DoGetDataTxVector(Lookup(address), allowedWidth);
         txVector.SetLdpc(txVector.GetMode().GetModulationClass() < WIFI_MOD_CLASS_HT
-                             ? 0
+                             ? false
                              : UseLdpcForDestination(address));
     }
     Ptr<HeConfiguration> heConfiguration = m_wifiPhy->GetDevice()->GetHeConfiguration();
@@ -1164,7 +1162,7 @@ WifiRemoteStationManager::NeedCtsToSelf(WifiTxVector txVector)
     {
         // search for the BSS Basic Rate set, if the used mode is in the basic set then there is no
         // need for CTS To Self
-        for (WifiModeListIterator i = m_bssBasicRateSet.begin(); i != m_bssBasicRateSet.end(); i++)
+        for (auto i = m_bssBasicRateSet.begin(); i != m_bssBasicRateSet.end(); i++)
         {
             if (mode == *i)
             {
@@ -1176,8 +1174,7 @@ WifiRemoteStationManager::NeedCtsToSelf(WifiTxVector txVector)
         {
             // search for the BSS Basic MCS set, if the used mode is in the basic set then there is
             // no need for CTS To Self
-            for (WifiModeListIterator i = m_bssBasicMcsSet.begin(); i != m_bssBasicMcsSet.end();
-                 i++)
+            for (auto i = m_bssBasicMcsSet.begin(); i != m_bssBasicMcsSet.end(); i++)
             {
                 if (mode == *i)
                 {
@@ -1552,7 +1549,7 @@ WifiRemoteStationManager::AddStationHeCapabilities(Mac48Address from, HeCapabili
             state->m_channelWidth = 20;
         }
     }
-    if (heCapabilities.GetHeSuPpdu1xHeLtf800nsGi() == 1)
+    if (heCapabilities.GetHeSuPpdu1xHeLtf800nsGi())
     {
         state->m_guardInterval = 800;
     }
@@ -1763,7 +1760,7 @@ uint32_t
 WifiRemoteStationManager::GetNNonErpBasicModes() const
 {
     uint32_t size = 0;
-    for (WifiModeListIterator i = m_bssBasicRateSet.begin(); i != m_bssBasicRateSet.end(); i++)
+    for (auto i = m_bssBasicRateSet.begin(); i != m_bssBasicRateSet.end(); i++)
     {
         if (i->GetModulationClass() == WIFI_MOD_CLASS_ERP_OFDM)
         {
@@ -1780,7 +1777,7 @@ WifiRemoteStationManager::GetNonErpBasicMode(uint8_t i) const
     NS_ASSERT(i < GetNNonErpBasicModes());
     uint32_t index = 0;
     bool found = false;
-    for (WifiModeListIterator j = m_bssBasicRateSet.begin(); j != m_bssBasicRateSet.end();)
+    for (auto j = m_bssBasicRateSet.begin(); j != m_bssBasicRateSet.end();)
     {
         if (i == index)
         {
@@ -1904,7 +1901,7 @@ WifiRemoteStationManager::GetNonErpSupported(const WifiRemoteStation* station, u
     // moved in case it breaks standard rules.
     uint32_t index = 0;
     bool found = false;
-    for (WifiModeListIterator j = station->m_state->m_operationalRateSet.begin();
+    for (auto j = station->m_state->m_operationalRateSet.begin();
          j != station->m_state->m_operationalRateSet.end();)
     {
         if (i == index)
@@ -2050,7 +2047,7 @@ uint32_t
 WifiRemoteStationManager::GetNNonErpSupported(const WifiRemoteStation* station) const
 {
     uint32_t size = 0;
-    for (WifiModeListIterator i = station->m_state->m_operationalRateSet.begin();
+    for (auto i = station->m_state->m_operationalRateSet.begin();
          i != station->m_state->m_operationalRateSet.end();
          i++)
     {

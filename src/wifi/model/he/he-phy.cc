@@ -401,7 +401,7 @@ HePhy::StartReceivePreamble(Ptr<const WifiPpdu> ppdu,
     }
     else
     {
-        PhyEntity::StartReceivePreamble(
+        VhtPhy::StartReceivePreamble(
             ppdu,
             rxPowersW,
             ppdu->GetTxDuration()); // The actual duration of the PPDU should be used
@@ -417,7 +417,7 @@ HePhy::CancelAllEvents()
         beginMuPayloadRxEvent.second.Cancel();
     }
     m_beginMuPayloadRxEvents.clear();
-    PhyEntity::CancelAllEvents();
+    VhtPhy::CancelAllEvents();
 }
 
 void
@@ -434,7 +434,7 @@ HePhy::DoAbortCurrentReception(WifiPhyRxfailureReason reason)
     }
     else
     {
-        PhyEntity::DoAbortCurrentReception(reason);
+        VhtPhy::DoAbortCurrentReception(reason);
     }
 }
 
@@ -464,8 +464,8 @@ HePhy::DoGetEvent(Ptr<const WifiPpdu> ppdu, RxPowerWattPerChannelBand& rxPowersW
     const auto uidPreamblePair = std::make_pair(ppdu->GetUid(), ppdu->GetPreamble());
     const auto& currentPreambleEvents = GetCurrentPreambleEvents();
     const auto it = currentPreambleEvents.find(uidPreamblePair);
-    const auto isResponseToTrigger = (m_previouslyTxPpduUid == ppdu->GetUid());
-    if (ppdu->GetType() == WIFI_PPDU_TYPE_UL_MU || isResponseToTrigger)
+    if (const auto isResponseToTrigger = (m_previouslyTxPpduUid == ppdu->GetUid());
+        ppdu->GetType() == WIFI_PPDU_TYPE_UL_MU || isResponseToTrigger)
     {
         const auto& txVector = ppdu->GetTxVector();
         const auto rxDuration =
@@ -486,34 +486,7 @@ HePhy::DoGetEvent(Ptr<const WifiPpdu> ppdu, RxPowerWattPerChannelBand& rxPowersW
                 NS_LOG_DEBUG("Received another response to a trigger frame " << ppdu->GetUid());
             }
             event = it->second;
-
-            if (Simulator::Now() - event->GetStartTime() > GetMaxDelayPpduSameUid(txVector))
-            {
-                // This HE TB PPDU arrived too late to be decoded properly. The HE TB PPDU
-                // is dropped and added as interference
-                event = CreateInterferenceEvent(ppdu, rxDuration, rxPowersW);
-                NS_LOG_DEBUG("Drop HE TB PPDU that arrived too late");
-                m_wifiPhy->NotifyRxDrop(GetAddressedPsduInPpdu(ppdu), PPDU_TOO_LATE);
-            }
-            else
-            {
-                // Update received power of the event associated to that UL MU transmission
-                UpdateInterferenceEvent(event, rxPowersW);
-            }
-
-            if (ppdu->GetType() == WIFI_PPDU_TYPE_UL_MU && GetCurrentEvent() &&
-                (GetCurrentEvent()->GetPpdu()->GetUid() != ppdu->GetUid()))
-            {
-                NS_LOG_DEBUG("Drop packet because already receiving another HE TB PPDU");
-                m_wifiPhy->NotifyRxDrop(GetAddressedPsduInPpdu(ppdu), RXING);
-            }
-            else if (isResponseToTrigger && GetCurrentEvent() &&
-                     (GetCurrentEvent()->GetPpdu()->GetUid() != ppdu->GetUid()))
-            {
-                NS_LOG_DEBUG(
-                    "Drop packet because already receiving another response to a trigger frame");
-                m_wifiPhy->NotifyRxDrop(GetAddressedPsduInPpdu(ppdu), RXING);
-            }
+            HandleRxPpduWithSameContent(event, ppdu, rxPowersW);
             return nullptr;
         }
         else
@@ -542,9 +515,31 @@ HePhy::DoGetEvent(Ptr<const WifiPpdu> ppdu, RxPowerWattPerChannelBand& rxPowersW
     }
     else
     {
-        event = PhyEntity::DoGetEvent(ppdu, rxPowersW);
+        event = VhtPhy::DoGetEvent(ppdu, rxPowersW);
     }
     return event;
+}
+
+void
+HePhy::HandleRxPpduWithSameContent(Ptr<Event> event,
+                                   Ptr<const WifiPpdu> ppdu,
+                                   RxPowerWattPerChannelBand& rxPower)
+{
+    VhtPhy::HandleRxPpduWithSameContent(event, ppdu, rxPower);
+
+    if (ppdu->GetType() == WIFI_PPDU_TYPE_UL_MU && GetCurrentEvent() &&
+        (GetCurrentEvent()->GetPpdu()->GetUid() != ppdu->GetUid()))
+    {
+        NS_LOG_DEBUG("Drop packet because already receiving another HE TB PPDU");
+        m_wifiPhy->NotifyRxDrop(GetAddressedPsduInPpdu(ppdu), RXING);
+    }
+    else if (const auto isResponseToTrigger = (m_previouslyTxPpduUid == ppdu->GetUid());
+             isResponseToTrigger && GetCurrentEvent() &&
+             (GetCurrentEvent()->GetPpdu()->GetUid() != ppdu->GetUid()))
+    {
+        NS_LOG_DEBUG("Drop packet because already receiving another response to a trigger frame");
+        m_wifiPhy->NotifyRxDrop(GetAddressedPsduInPpdu(ppdu), RXING);
+    }
 }
 
 Ptr<const WifiPsdu>
@@ -556,7 +551,7 @@ HePhy::GetAddressedPsduInPpdu(Ptr<const WifiPpdu> ppdu) const
         NS_ASSERT(hePpdu);
         return hePpdu->GetPsdu(GetBssColor(), GetStaId(ppdu));
     }
-    return PhyEntity::GetAddressedPsduInPpdu(ppdu);
+    return VhtPhy::GetAddressedPsduInPpdu(ppdu);
 }
 
 uint8_t
@@ -589,14 +584,14 @@ HePhy::GetStaId(const Ptr<const WifiPpdu> ppdu) const
             return mac->GetAssociationId();
         }
     }
-    return PhyEntity::GetStaId(ppdu);
+    return VhtPhy::GetStaId(ppdu);
 }
 
 PhyEntity::PhyFieldRxStatus
 HePhy::ProcessSig(Ptr<Event> event, PhyFieldRxStatus status, WifiPpduField field)
 {
     NS_LOG_FUNCTION(this << *event << status << field);
-    NS_ASSERT(event->GetTxVector().GetPreambleType() >= WIFI_PREAMBLE_HE_SU);
+    NS_ASSERT(event->GetPpdu()->GetTxVector().GetPreambleType() >= WIFI_PREAMBLE_HE_SU);
     switch (field)
     {
     case WIFI_PPDU_FIELD_SIG_A:
@@ -614,7 +609,7 @@ HePhy::ProcessSigA(Ptr<Event> event, PhyFieldRxStatus status)
 {
     NS_LOG_FUNCTION(this << *event << status);
     // Notify end of SIG-A (in all cases)
-    WifiTxVector txVector = event->GetTxVector();
+    const auto& txVector = event->GetPpdu()->GetTxVector();
     HeSigAParameters params;
     params.rssiW = GetRxPowerWForPpdu(event);
     params.bssColor = txVector.GetBssColor();
@@ -728,7 +723,7 @@ PhyEntity::PhyFieldRxStatus
 HePhy::ProcessSigB(Ptr<Event> event, PhyFieldRxStatus status)
 {
     NS_LOG_FUNCTION(this << *event << status);
-    NS_ASSERT(IsDlMu(event->GetTxVector().GetPreambleType()));
+    NS_ASSERT(IsDlMu(event->GetPpdu()->GetTxVector().GetPreambleType()));
     if (status.isSuccess)
     {
         // Check if PPDU is filtered only if the SIG-B content is supported (not explicitly stated
@@ -740,18 +735,9 @@ HePhy::ProcessSigB(Ptr<Event> event, PhyFieldRxStatus status)
             return PhyFieldRxStatus(false, FILTERED, DROP);
         }
     }
-    if (event->GetTxVector().IsDlMu())
-    {
-        // When including a Trigger Frame, a DL MU PPDU solicits a TB PPDU.
-        // NOTE that the 'if' condition above is not needed for HE because SIG-B is only
-        // included in HE MU PPDUs, but it is necessary for EHT to avoid that a non-AP
-        // STA receiving a Trigger Frame sent as an EHT SU transmission (which carries
-        // the EHT-SIG field) stores the PPDU UID and uses it later to schedule the
-        // reception of the payload of the TB PPDU (see HePhy::StartReceivePreamble())
-        // despite it lacks the TRIGVECTOR.
-        m_currentMuPpduUid =
-            event->GetPpdu()->GetUid(); // to be able to correctly schedule start of MU payload
-    }
+    m_currentMuPpduUid =
+        event->GetPpdu()->GetUid(); // to be able to correctly schedule start of MU payload
+
     return status;
 }
 
@@ -763,7 +749,7 @@ HePhy::IsConfigSupported(Ptr<const WifiPpdu> ppdu) const
         return true; // evaluated in ProcessSigA
     }
 
-    const WifiTxVector& txVector = ppdu->GetTxVector();
+    const auto& txVector = ppdu->GetTxVector();
     uint16_t staId = GetStaId(ppdu);
     WifiMode txMode = txVector.GetMode(staId);
     uint8_t nss = txVector.GetNssMax();
@@ -798,15 +784,15 @@ Time
 HePhy::DoStartReceivePayload(Ptr<Event> event)
 {
     NS_LOG_FUNCTION(this << *event);
-    const auto& txVector = event->GetTxVector();
+    const auto ppdu = event->GetPpdu();
+    const auto& txVector = ppdu->GetTxVector();
 
     if (!txVector.IsMu())
     {
-        return PhyEntity::DoStartReceivePayload(event);
+        return VhtPhy::DoStartReceivePayload(event);
     }
 
     NS_ASSERT(txVector.GetModulationClass() >= WIFI_MOD_CLASS_HE);
-    Ptr<const WifiPpdu> ppdu = event->GetPpdu();
 
     if (txVector.IsDlMu())
     {
@@ -836,7 +822,7 @@ HePhy::DoStartReceivePayload(Ptr<Event> event)
         NS_LOG_DEBUG("Ignore HE TB PPDU payload received by STA but keep state in Rx");
         NotifyPayloadBegin(txVector, timeToEndRx);
         m_endRxPayloadEvents.push_back(
-            Simulator::Schedule(timeToEndRx, &PhyEntity::ResetReceive, this, event));
+            Simulator::Schedule(timeToEndRx, &HePhy::ResetReceive, this, event));
         // Cancel all scheduled events for MU payload reception
         NS_ASSERT(!m_beginMuPayloadRxEvents.empty() &&
                   m_beginMuPayloadRxEvents.begin()->second.IsRunning());
@@ -932,8 +918,10 @@ HePhy::DoEndReceivePayload(Ptr<const WifiPpdu> ppdu)
     else
     {
         NS_ASSERT(m_wifiPhy->GetLastRxEndTime() == Simulator::Now());
-        PhyEntity::DoEndReceivePayload(ppdu);
+        VhtPhy::DoEndReceivePayload(ppdu);
     }
+    // we are done receiving the payload, we can reset the current MU PPDU UID
+    m_currentMuPpduUid = UINT64_MAX;
 }
 
 void
@@ -969,7 +957,7 @@ HePhy::StartReceiveMuPayload(Ptr<Event> event)
     Ptr<const WifiPsdu> psdu = GetAddressedPsduInPpdu(ppdu);
     ScheduleEndOfMpdus(event);
     m_endRxPayloadEvents.push_back(
-        Simulator::Schedule(payloadDuration, &PhyEntity::EndReceivePayload, this, event));
+        Simulator::Schedule(payloadDuration, &HePhy::EndReceivePayload, this, event));
     uint16_t staId = GetStaId(ppdu);
     m_signalNoiseMap.insert({std::make_pair(ppdu->GetUid(), staId), SignalNoiseDbm()});
     m_statusPerMpduMap.insert({std::make_pair(ppdu->GetUid(), staId), std::vector<bool>()});
@@ -987,7 +975,7 @@ HePhy::GetChannelWidthAndBand(const WifiTxVector& txVector, uint16_t staId) cons
     }
     else
     {
-        return PhyEntity::GetChannelWidthAndBand(txVector, staId);
+        return VhtPhy::GetChannelWidthAndBand(txVector, staId);
     }
 }
 
@@ -1498,7 +1486,7 @@ HePhy::StartTx(Ptr<const WifiPpdu> ppdu)
     }
     else
     {
-        PhyEntity::StartTx(ppdu);
+        VhtPhy::StartTx(ppdu);
     }
 }
 
@@ -1786,7 +1774,7 @@ HePhy::GetMaxPsduSize() const
 }
 
 bool
-HePhy::CanStartRx(Ptr<const WifiPpdu> ppdu, uint16_t txChannelWidth) const
+HePhy::CanStartRx(Ptr<const WifiPpdu> ppdu) const
 {
     /*
      * The PHY shall not issue a PHY-RXSTART.indication primitive in response to a PPDU
@@ -1801,7 +1789,7 @@ HePhy::CanStartRx(Ptr<const WifiPpdu> ppdu, uint16_t txChannelWidth) const
     {
         return true;
     }
-    return PhyEntity::CanStartRx(ppdu, txChannelWidth);
+    return VhtPhy::CanStartRx(ppdu);
 }
 
 Ptr<const WifiPpdu>
@@ -1827,19 +1815,7 @@ HePhy::GetRxPpduFromTxPpdu(Ptr<const WifiPpdu> ppdu)
         hePpdu->UpdateTxVectorForUlMu(m_trigVector);
         return rxPpdu;
     }
-    else if (auto txVector = ppdu->GetTxVector();
-             m_currentTxVector.has_value() &&
-             (m_previouslyTxPpduUid == ppdu->GetUid()) &&         // response to a trigger frame
-             (txVector.GetModulationClass() < WIFI_MOD_CLASS_HT)) // PPDU is a non-HT (duplicate)
-    {
-        auto triggerChannelWidth = m_currentTxVector->GetChannelWidth();
-        if (txVector.GetChannelWidth() != triggerChannelWidth)
-        {
-            txVector.SetChannelWidth(triggerChannelWidth);
-            ppdu->UpdateTxVector(txVector);
-        }
-    }
-    return PhyEntity::GetRxPpduFromTxPpdu(ppdu);
+    return VhtPhy::GetRxPpduFromTxPpdu(ppdu);
 }
 
 WifiSpectrumBandIndices
@@ -1850,7 +1826,7 @@ HePhy::ConvertHeRuSubcarriers(uint16_t bandWidth,
                               uint8_t bandIndex)
 {
     WifiSpectrumBandIndices convertedSubcarriers;
-    uint32_t nGuardBands =
+    auto nGuardBands =
         static_cast<uint32_t>(((2 * guardBandwidth * 1e6) / subcarrierSpacing) + 0.5);
     uint32_t centerFrequencyIndex = 0;
     switch (bandWidth)
@@ -1872,53 +1848,12 @@ HePhy::ConvertHeRuSubcarriers(uint16_t bandWidth,
         break;
     }
 
-    size_t numBandsInBand = static_cast<size_t>(bandWidth * 1e6 / subcarrierSpacing);
+    auto numBandsInBand = static_cast<size_t>(bandWidth * 1e6 / subcarrierSpacing);
     centerFrequencyIndex += numBandsInBand * bandIndex;
 
     convertedSubcarriers.first = centerFrequencyIndex + subcarrierRange.first;
     convertedSubcarriers.second = centerFrequencyIndex + subcarrierRange.second;
     return convertedSubcarriers;
-}
-
-HePhy::RuBands
-HePhy::GetRuBands(Ptr<const WifiPhy> phy, uint16_t channelWidth, uint16_t guardBandwidth)
-{
-    HePhy::RuBands ruBands{};
-    for (uint16_t bw = 160; bw >= 20; bw = bw / 2)
-    {
-        for (uint32_t i = 0; i < (channelWidth / bw); ++i)
-        {
-            for (uint32_t type = 0; type < 7; type++)
-            {
-                HeRu::RuType ruType = static_cast<HeRu::RuType>(type);
-                std::size_t nRus = HeRu::GetNRus(bw, ruType);
-                for (std::size_t phyIndex = 1; phyIndex <= nRus; phyIndex++)
-                {
-                    HeRu::SubcarrierGroup group = HeRu::GetSubcarrierGroup(bw, ruType, phyIndex);
-                    HeRu::SubcarrierRange subcarrierRange =
-                        std::make_pair(group.front().first, group.back().second);
-                    const auto bandIndices = ConvertHeRuSubcarriers(bw,
-                                                                    guardBandwidth,
-                                                                    phy->GetSubcarrierSpacing(),
-                                                                    subcarrierRange,
-                                                                    i);
-                    const auto bandFrequencies = phy->ConvertIndicesToFrequencies(bandIndices);
-                    WifiSpectrumBandInfo band = {bandIndices, bandFrequencies};
-                    std::size_t index =
-                        (bw == 160 && phyIndex > nRus / 2 ? phyIndex - nRus / 2 : phyIndex);
-                    const auto p20Index = phy->GetOperatingChannel().GetPrimaryChannelIndex(20);
-                    bool primary80IsLower80 = (p20Index < bw / 40);
-                    bool primary80 = (bw < 160 || ruType == HeRu::RU_2x996_TONE ||
-                                      (primary80IsLower80 && phyIndex <= nRus / 2) ||
-                                      (!primary80IsLower80 && phyIndex > nRus / 2));
-                    HeRu::RuSpec ru(ruType, index, primary80);
-                    NS_ABORT_IF(ru.GetPhyIndex(bw, p20Index) != phyIndex);
-                    ruBands.insert({band, ru});
-                }
-            }
-        }
-    }
-    return ruBands;
 }
 
 } // namespace ns3

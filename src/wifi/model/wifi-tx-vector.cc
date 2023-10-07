@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <numeric>
 #include <set>
 
 namespace ns3
@@ -218,6 +219,7 @@ WifiTxVector::GetNss(uint16_t staId) const
 uint8_t
 WifiTxVector::GetNssMax() const
 {
+    // We do not support mixed OFDMA and MU-MIMO
     uint8_t nss = 0;
     if (IsMu())
     {
@@ -225,6 +227,26 @@ WifiTxVector::GetNssMax() const
         {
             nss = (nss < info.second.nss) ? info.second.nss : nss;
         }
+    }
+    else
+    {
+        nss = m_nss;
+    }
+    return nss;
+}
+
+uint8_t
+WifiTxVector::GetNssTotal() const
+{
+    // We do not support mixed OFDMA and MU-MIMO
+    uint8_t nss = 0;
+    if (IsMu())
+    {
+        nss = std::accumulate(
+            m_muUserInfos.cbegin(),
+            m_muUserInfos.cend(),
+            0,
+            [](uint8_t prevNss, const auto& info) { return prevNss + info.second.nss; });
     }
     else
     {
@@ -260,8 +282,7 @@ WifiTxVector::IsLdpc() const
 bool
 WifiTxVector::IsNonHtDuplicate() const
 {
-    return ((m_channelWidth >= 40) && !IsMu() &&
-            (GetMode().GetModulationClass() < WIFI_MOD_CLASS_HT));
+    return ((m_channelWidth >= 40) && !IsMu() && (GetModulationClass() < WIFI_MOD_CLASS_HT));
 }
 
 void

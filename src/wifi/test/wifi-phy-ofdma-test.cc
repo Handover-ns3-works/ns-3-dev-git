@@ -2444,7 +2444,6 @@ TestMultipleHeTbPreambles::RxHeTbPpdu(uint64_t uid,
     rxParams->txPhy = nullptr;
     rxParams->duration = nonOfdmaDuration;
     rxParams->ppdu = ppdu;
-    rxParams->txWidth = channelWidth;
 
     uint16_t length;
     std::tie(length, ppduDuration) =
@@ -2471,7 +2470,6 @@ TestMultipleHeTbPreambles::RxHeTbPpdu(uint64_t uid,
     rxParamsOfdma->txPhy = nullptr;
     rxParamsOfdma->duration = ppduDuration - nonOfdmaDuration;
     rxParamsOfdma->ppdu = ppduOfdma;
-    rxParamsOfdma->txWidth = DEFAULT_CHANNEL_WIDTH;
     Simulator::Schedule(nonOfdmaDuration,
                         &TestMultipleHeTbPreambles::RxHeTbPpduOfdmaPart,
                         this,
@@ -4890,7 +4888,7 @@ TestPhyPaddingExclusion::SendHeTbPpdu(uint16_t txStaId,
                                          DEFAULT_CHANNEL_WIDTH,
                                          false,
                                          false,
-                                         1);
+                                         true);
 
     HeRu::RuSpec ru(HeRu::RU_106_TONE, index, false);
     txVector.SetRu(ru, txStaId);
@@ -5186,7 +5184,7 @@ TestPhyPaddingExclusion::SetTrigVector(Time ppduDuration)
                             DEFAULT_CHANNEL_WIDTH,
                             false,
                             false,
-                            1);
+                            true);
     trigVector.SetRu(HeRu::RuSpec(HeRu::RU_106_TONE, 1, false), 1);
     trigVector.SetMode(HePhy::GetHeMcs7(), 1);
     trigVector.SetNss(1, 1);

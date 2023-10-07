@@ -23,12 +23,13 @@
 #include "lte-ffr-simple.h"
 #include "lte-simple-spectrum-phy.h"
 
-#include "ns3/applications-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/lte-helper.h"
 #include "ns3/mobility-helper.h"
+#include "ns3/packet-sink-helper.h"
 #include "ns3/point-to-point-epc-helper.h"
 #include "ns3/point-to-point-module.h"
+#include "ns3/udp-client-server-helper.h"
 #include <ns3/boolean.h>
 #include <ns3/callback.h>
 #include <ns3/config.h>
@@ -443,13 +444,13 @@ static LteFrequencyReuseTestSuite lteFrequencyReuseTestSuite;
  * TestCase Data
  */
 void
-DlDataRxStartNofitication(LteFrTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
+DlDataRxStartNotification(LteFrTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
 {
     testcase->DlDataRxStart(spectrumValue);
 }
 
 void
-UlDataRxStartNofitication(LteFrTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
+UlDataRxStartNotification(LteFrTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
 {
     testcase->UlDataRxStart(spectrumValue);
 }
@@ -479,9 +480,8 @@ void
 LteFrTestCase::DlDataRxStart(Ptr<const SpectrumValue> spectrumValue)
 {
     NS_LOG_DEBUG("DL DATA Power allocation :");
-    Values::const_iterator it;
     uint32_t i = 0;
-    for (it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
+    for (auto it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
     {
         double power = (*it) * (m_dlBandwidth * 180000);
         NS_LOG_DEBUG("RB " << i << " POWER: "
@@ -499,9 +499,8 @@ void
 LteFrTestCase::UlDataRxStart(Ptr<const SpectrumValue> spectrumValue)
 {
     NS_LOG_DEBUG("UL DATA Power allocation :");
-    Values::const_iterator it;
     uint32_t i = 0;
-    for (it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
+    for (auto it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
     {
         double power = (*it) * (m_ulBandwidth * 180000);
         NS_LOG_DEBUG("RB " << i << " POWER: "
@@ -618,7 +617,7 @@ LteHardFrTestCase::DoRun()
 
     testDlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&DlDataRxStartNofitication, this));
+        MakeBoundCallback(&DlDataRxStartNotification, this));
 
     // Test SpectrumPhy to get signals form UL channel
     Ptr<LteSpectrumPhy> ueUlSpectrumPhy = ueDevs.Get(0)
@@ -635,7 +634,7 @@ LteHardFrTestCase::DoRun()
 
     testUlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&UlDataRxStartNofitication, this));
+        MakeBoundCallback(&UlDataRxStartNotification, this));
 
     Simulator::Stop(Seconds(0.500));
     Simulator::Run();
@@ -756,7 +755,7 @@ LteStrictFrTestCase::DoRun()
 
     testDlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&DlDataRxStartNofitication, this));
+        MakeBoundCallback(&DlDataRxStartNotification, this));
 
     // Test SpectrumPhy to get signals form UL channel
     Ptr<LteSpectrumPhy> ueUlSpectrumPhy = ueDevs.Get(0)
@@ -773,7 +772,7 @@ LteStrictFrTestCase::DoRun()
 
     testUlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&UlDataRxStartNofitication, this));
+        MakeBoundCallback(&UlDataRxStartNotification, this));
 
     Simulator::Stop(Seconds(0.500));
     Simulator::Run();
@@ -786,13 +785,13 @@ LteStrictFrTestCase::DoRun()
 }
 
 void
-DlDataRxStartNofiticationArea(LteFrAreaTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
+DlDataRxStartNotificationArea(LteFrAreaTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
 {
     testcase->DlDataRxStart(spectrumValue);
 }
 
 void
-UlDataRxStartNofiticationArea(LteFrAreaTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
+UlDataRxStartNotificationArea(LteFrAreaTestCase* testcase, Ptr<const SpectrumValue> spectrumValue)
 {
     testcase->UlDataRxStart(spectrumValue);
 }
@@ -821,9 +820,8 @@ LteFrAreaTestCase::DlDataRxStart(Ptr<const SpectrumValue> spectrumValue)
     }
 
     NS_LOG_DEBUG("DL DATA Power allocation :");
-    Values::const_iterator it;
     uint32_t i = 0;
-    for (it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
+    for (auto it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
     {
         double power = (*it) * (m_dlBandwidth * 180000);
         NS_LOG_DEBUG("RB " << i << " POWER: "
@@ -857,7 +855,6 @@ LteFrAreaTestCase::UlDataRxStart(Ptr<const SpectrumValue> spectrumValue)
     }
 
     NS_LOG_DEBUG("UL DATA Power allocation :");
-    Values::const_iterator it;
     uint32_t i = 0;
     uint32_t numActiveRbs = 0;
 
@@ -865,7 +862,7 @@ LteFrAreaTestCase::UlDataRxStart(Ptr<const SpectrumValue> spectrumValue)
     // of active RBs. This method is independent of the bandwidth
     // configuration done in a test scenario, thus, it requires
     // minimum change to the script.
-    for (it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
+    for (auto it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
     {
         // Count the RB as active if it is part of
         // the expected UL RBs and has Power Spectral Density (PSD) > 0
@@ -878,7 +875,7 @@ LteFrAreaTestCase::UlDataRxStart(Ptr<const SpectrumValue> spectrumValue)
 
     // The uplink power control and the uplink PSD
     // calculation only consider active resource blocks.
-    for (it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
+    for (auto it = spectrumValue->ConstValuesBegin(); it != spectrumValue->ConstValuesEnd(); it++)
     {
         double power = (*it) * (numActiveRbs * 180000);
         NS_LOG_DEBUG("RB " << i << " POWER: " << power
@@ -1090,7 +1087,7 @@ LteStrictFrAreaTestCase::DoRun()
 
     testDlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&DlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&DlDataRxStartNotificationArea, this));
 
     // Test SpectrumPhy to get signals form UL channel
     Ptr<LteSpectrumPhy> ueUlSpectrumPhy = ueDevs1.Get(0)
@@ -1109,7 +1106,7 @@ LteStrictFrAreaTestCase::DoRun()
 
     testUlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&UlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&UlDataRxStartNotificationArea, this));
 
     std::vector<bool> expectedDlRbCenterArea;
     expectedDlRbCenterArea.resize(m_dlBandwidth, false);
@@ -1306,7 +1303,7 @@ LteSoftFrAreaTestCase::DoRun()
 
     testDlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&DlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&DlDataRxStartNotificationArea, this));
 
     // Test SpectrumPhy to get signals form UL channel
     Ptr<LteSpectrumPhy> ueUlSpectrumPhy = ueDevs1.Get(0)
@@ -1325,7 +1322,7 @@ LteSoftFrAreaTestCase::DoRun()
 
     testUlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&UlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&UlDataRxStartNotificationArea, this));
 
     std::vector<bool> expectedDlRbCenterArea;
     expectedDlRbCenterArea.resize(m_dlBandwidth, false);
@@ -1535,7 +1532,7 @@ LteSoftFfrAreaTestCase::DoRun()
 
     testDlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&DlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&DlDataRxStartNotificationArea, this));
 
     // Test SpectrumPhy to get signals form UL channel
     Ptr<LteSpectrumPhy> ueUlSpectrumPhy = ueDevs1.Get(0)
@@ -1554,7 +1551,7 @@ LteSoftFfrAreaTestCase::DoRun()
 
     testUlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&UlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&UlDataRxStartNotificationArea, this));
 
     double expectedDlPowerCenterArea = 0.5;
     std::vector<bool> expectedDlRbCenterArea;
@@ -1806,7 +1803,7 @@ LteEnhancedFfrAreaTestCase::DoRun()
 
     testDlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&DlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&DlDataRxStartNotificationArea, this));
 
     // Test SpectrumPhy to get signals form UL channel
     Ptr<LteSpectrumPhy> ueUlSpectrumPhy = ueDevs1.Get(0)
@@ -1825,7 +1822,7 @@ LteEnhancedFfrAreaTestCase::DoRun()
 
     testUlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&UlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&UlDataRxStartNotificationArea, this));
 
     double expectedDlPowerCenterArea = 0.251189;
     std::vector<bool> expectedDlRbCenterArea;
@@ -2187,7 +2184,7 @@ LteDistributedFfrAreaTestCase::DoRun()
 
     testDlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&DlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&DlDataRxStartNotificationArea, this));
 
     // Test SpectrumPhy to get signals form UL channel
     Ptr<LteSpectrumPhy> ueUlSpectrumPhy = ueDevs1.Get(0)
@@ -2206,7 +2203,7 @@ LteDistributedFfrAreaTestCase::DoRun()
 
     testUlSpectrumPhy->TraceConnectWithoutContext(
         "RxStart",
-        MakeBoundCallback(&UlDataRxStartNofiticationArea, this));
+        MakeBoundCallback(&UlDataRxStartNotificationArea, this));
 
     double expectedDlPowerCenterArea = 1.0;
     std::vector<bool> expectedDlRbCenterArea;

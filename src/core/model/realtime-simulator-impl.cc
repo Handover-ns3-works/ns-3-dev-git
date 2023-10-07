@@ -453,16 +453,15 @@ RealtimeSimulatorImpl::Run()
             }
         }
 
-        if (!process)
+        if (process)
         {
-            // Sleep until signalled
-            tsNow = m_synchronizer->Synchronize(tsNow, tsDelay);
-
-            // Re-check event queue
-            continue;
+            ProcessOneEvent();
         }
-
-        ProcessOneEvent();
+        else
+        {
+            // Sleep until signalled and re-check event queue
+            m_synchronizer->Synchronize(tsNow, tsDelay);
+        }
     }
 
     //
@@ -704,7 +703,7 @@ RealtimeSimulatorImpl::Remove(const EventId& id)
     if (id.GetUid() == EventId::UID::DESTROY)
     {
         // destroy events.
-        for (DestroyEvents::iterator i = m_destroyEvents.begin(); i != m_destroyEvents.end(); i++)
+        for (auto i = m_destroyEvents.begin(); i != m_destroyEvents.end(); i++)
         {
             if (*i == id)
             {
@@ -754,8 +753,7 @@ RealtimeSimulatorImpl::IsExpired(const EventId& id) const
             return true;
         }
         // destroy events.
-        for (DestroyEvents::const_iterator i = m_destroyEvents.begin(); i != m_destroyEvents.end();
-             i++)
+        for (auto i = m_destroyEvents.begin(); i != m_destroyEvents.end(); i++)
         {
             if (*i == id)
             {

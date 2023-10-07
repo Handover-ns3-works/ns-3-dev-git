@@ -295,6 +295,44 @@ class StaWifiMac : public WifiMac
     void NotifyChannelSwitching(uint8_t linkId) override;
 
     /**
+     * Notify the MAC that EMLSR mode has changed on the given set of links.
+     *
+     * \param linkIds the IDs of the links that are now EMLSR links (EMLSR mode is disabled
+     *                on other links)
+     */
+    void NotifyEmlsrModeChanged(const std::set<uint8_t>& linkIds);
+
+    /**
+     * \param linkId the ID of the given link
+     * \return whether the EMLSR mode is enabled on the given link
+     */
+    bool IsEmlsrLink(uint8_t linkId) const;
+
+    /**
+     * Notify that the given PHY switched channel to operate on another EMLSR link.
+     *
+     * \param phy the given PHY
+     * \param linkId the ID of the EMLSR link on which the given PHY is operating
+     */
+    void NotifySwitchingEmlsrLink(Ptr<WifiPhy> phy, uint8_t linkId);
+
+    /**
+     * Block transmissions on the given link for the given reason.
+     *
+     * \param linkId the ID of the given link
+     * \param reason the reason for blocking transmissions on the given link
+     */
+    void BlockTxOnLink(uint8_t linkId, WifiQueueBlockedReason reason);
+
+    /**
+     * Unblock transmissions on the given link for the given reason.
+     *
+     * \param linkId the ID of the given link
+     * \param reason the reason for unblocking transmissions on the given link
+     */
+    void UnblockTxOnLink(uint8_t linkId, WifiQueueBlockedReason reason);
+
+    /**
      * Assign a fixed random variable stream number to the random variables
      * used by this model.  Return the number of streams (possibly zero) that
      * have been assigned.
@@ -324,6 +362,7 @@ class StaWifiMac : public WifiMac
         WifiPowerManagementMode pmMode{WIFI_PM_ACTIVE}; /**< the current PM mode, if the STA is
                                                              associated, or the PM mode to switch
                                                              to upon association, otherwise */
+        bool emlsrEnabled{false}; //!< whether EMLSR mode is enabled on this link
     };
 
     /**
@@ -342,7 +381,7 @@ class StaWifiMac : public WifiMac
      */
     StaLinkEntity& GetStaLink(const std::unique_ptr<WifiMac::LinkEntity>& link) const;
 
-  private:
+  public:
     /**
      * The current MAC state of the STA.
      */
@@ -355,6 +394,7 @@ class StaWifiMac : public WifiMac
         REFUSED
     };
 
+  private:
     /**
      * Enable or disable active probing.
      *

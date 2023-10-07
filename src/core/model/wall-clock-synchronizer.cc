@@ -128,7 +128,7 @@ WallClockSynchronizer::DoGetDrift(uint64_t ns)
     // then subtract the current real time in normalized nanoseconds we just got
     // from the normalized simulation time in nanoseconds that is passed in as
     // the parameter ns.  We return an integer difference, but in reality all of
-    // the mechanisms that cause wall-clock to simuator time drift cause events
+    // the mechanisms that cause wall-clock to simulator time drift cause events
     // to be late.  That means that the wall-clock will be higher than the
     // simulation time and drift will be positive.  I would be astonished to
     // see a negative drift, but the possibility is admitted for other
@@ -363,7 +363,7 @@ WallClockSynchronizer::DriftCorrect(uint64_t nsNow, uint64_t nsDelay)
     // have more drift than delay, then we just play catch up as fast as possible
     // by not delaying at all.
     //
-    uint64_t correction = (uint64_t)drift;
+    auto correction = (uint64_t)drift;
     if (correction <= nsDelay)
     {
         return nsDelay - correction;

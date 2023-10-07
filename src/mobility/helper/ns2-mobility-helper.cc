@@ -523,7 +523,7 @@ ParseNs2Line(const std::string& str)
     {
         std::string x;
         s >> x;
-        if (x.length() == 0)
+        if (x.empty())
         {
             continue;
         }
@@ -854,7 +854,7 @@ SetSchedPosition(Ptr<ConstantVelocityMobilityModel> model,
     position.y = model->GetPosition().y;
     position.z = model->GetPosition().z;
 
-    // Chedule next positions
+    // Schedule next positions
     Simulator::Schedule(Seconds(at), &ConstantVelocityMobilityModel::SetPosition, model, position);
 
     return position;

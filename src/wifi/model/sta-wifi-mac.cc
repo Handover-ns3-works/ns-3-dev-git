@@ -31,6 +31,7 @@
 #include "wifi-net-device.h"
 #include "wifi-phy.h"
 
+#include "ns3/attribute-container.h"
 #include "ns3/eht-configuration.h"
 #include "ns3/emlsr-manager.h"
 #include "ns3/he-configuration.h"
@@ -162,6 +163,20 @@ void
 StaWifiMac::DoInitialize()
 {
     NS_LOG_FUNCTION(this);
+    // an EMLSR client must perform ML setup by using its main PHY
+    if (m_assocManager && m_emlsrManager)
+    {
+        auto mainPhyId = m_emlsrManager->GetMainPhyId();
+        auto linkId = GetLinkForPhy(mainPhyId);
+        NS_ASSERT(linkId);
+        m_assocManager->SetAttribute(
+            "AllowedLinks",
+            AttributeContainerValue<UintegerValue>(std::list<uint8_t>{*linkId}));
+    }
+    if (m_emlsrManager)
+    {
+        m_emlsrManager->Initialize();
+    }
     StartScanning();
     NS_ABORT_IF(!TraceConnectWithoutContext("AckedMpdu", MakeCallback(&StaWifiMac::TxOk, this)));
     WifiMac::DoInitialize();
@@ -286,6 +301,39 @@ StaWifiMac::GetCurrentChannel(uint8_t linkId) const
     uint16_t width = phy->GetOperatingChannel().IsOfdm() ? 20 : phy->GetChannelWidth();
     uint8_t ch = phy->GetOperatingChannel().GetPrimaryChannelNumber(width, phy->GetStandard());
     return {ch, phy->GetPhyBand()};
+}
+
+void
+StaWifiMac::NotifyEmlsrModeChanged(const std::set<uint8_t>& linkIds)
+{
+    NS_LOG_FUNCTION(this << linkIds.size());
+
+    for (const auto& [linkId, lnk] : GetLinks())
+    {
+        auto& link = GetStaLink(lnk);
+
+        if (linkIds.count(linkId) > 0)
+        {
+            // EMLSR mode enabled
+            link.emlsrEnabled = true;
+            link.pmMode = WIFI_PM_ACTIVE;
+        }
+        else
+        {
+            // EMLSR mode disabled
+            if (link.emlsrEnabled)
+            {
+                link.pmMode = WIFI_PM_POWERSAVE;
+            }
+            link.emlsrEnabled = false;
+        }
+    }
+}
+
+bool
+StaWifiMac::IsEmlsrLink(uint8_t linkId) const
+{
+    return GetLink(linkId).emlsrEnabled;
 }
 
 void
@@ -999,6 +1047,50 @@ StaWifiMac::Enqueue(Ptr<Packet> packet, Mac48Address to)
     else
     {
         GetTxop()->Queue(packet, hdr);
+    }
+}
+
+void
+StaWifiMac::BlockTxOnLink(uint8_t linkId, WifiQueueBlockedReason reason)
+{
+    NS_LOG_FUNCTION(this << linkId << reason);
+
+    auto bssid = GetBssid(linkId);
+    auto apAddress = GetWifiRemoteStationManager(linkId)->GetMldAddress(bssid).value_or(bssid);
+
+    BlockUnicastTxOnLinks(reason, apAddress, {linkId});
+    // the only type of broadcast frames that a non-AP STA can send are management frames
+    for (const auto [acIndex, ac] : wifiAcList)
+    {
+        GetMacQueueScheduler()->BlockQueues(reason,
+                                            acIndex,
+                                            {WIFI_MGT_QUEUE},
+                                            Mac48Address::GetBroadcast(),
+                                            GetFrameExchangeManager(linkId)->GetAddress(),
+                                            {},
+                                            {linkId});
+    }
+}
+
+void
+StaWifiMac::UnblockTxOnLink(uint8_t linkId, WifiQueueBlockedReason reason)
+{
+    NS_LOG_FUNCTION(this << linkId << reason);
+
+    auto bssid = GetBssid(linkId);
+    auto apAddress = GetWifiRemoteStationManager(linkId)->GetMldAddress(bssid).value_or(bssid);
+
+    UnblockUnicastTxOnLinks(reason, apAddress, {linkId});
+    // the only type of broadcast frames that a non-AP STA can send are management frames
+    for (const auto [acIndex, ac] : wifiAcList)
+    {
+        GetMacQueueScheduler()->UnblockQueues(reason,
+                                              acIndex,
+                                              {WIFI_MGT_QUEUE},
+                                              Mac48Address::GetBroadcast(),
+                                              GetFrameExchangeManager(linkId)->GetAddress(),
+                                              {},
+                                              {linkId});
     }
 }
 
@@ -1872,6 +1964,83 @@ StaWifiMac::PhyCapabilitiesChanged()
         SetState(WAIT_ASSOC_RESP);
         SendAssociationRequest(true);
     }
+}
+
+/**
+ * Initial configuration:
+ *
+ *        ┌───┬───┬───┐        ┌────┐       ┌───────┐
+ * Link A │FEM│RSM│CAM│◄──────►│Main├──────►│Channel│
+ *        │   │   │   │        │PHY │       │   A   │
+ *        └───┴───┴───┘        └────┘       └───────┘
+ *
+ *        ┌───┬───┬───┐        ┌────┐       ┌───────┐
+ * Link B │FEM│RSM│CAM│        │Aux │       │Channel│
+ *        │   │   │   │◄──────►│PHY ├──────►│   B   │
+ *        └───┴───┴───┘        └────┘       └───────┘
+ *
+ * A link switching/swapping is notified by the EMLSR Manager and the Channel Access Manager
+ * (CAM) notifies us that a first PHY (i.e., the Main PHY) switches to Channel B. We connect
+ * the Main PHY to the MAC stack B:
+ *
+ *
+ *        ┌───┬───┬───┐        ┌────┐       ┌───────┐
+ * Link A │FEM│RSM│CAM│   ┌───►│Main├───┐   │Channel│
+ *        │   │   │   │   │    │PHY │   │   │   A   │
+ *        └───┴───┴───┘   │    └────┘   │   └───────┘
+ *                        │             │
+ *        ┌───┬───┬───┐   │    ┌────┐   │   ┌───────┐
+ * Link B │FEM│RSM│CAM│◄──┘    │Aux │   └──►│Channel│
+ *        │   │   │   │◄─ ─ ─ ─│PHY ├──────►│   B   │
+ *        └───┴───┴───┘INACTIVE└────┘       └───────┘
+ *
+ * MAC stack B keeps a PHY listener associated with the Aux PHY, even though it is inactive,
+ * meaning that the PHY listener will only notify channel switches (no CCA, no RX).
+ * If the EMLSR Manager requested a link switching, this configuration will be kept until
+ * further requests. If the EMLSR Manager requested a link swapping, link B's CAM will be
+ * notified by its (inactive) PHY listener upon the channel switch performed by the Aux PHY.
+ * In this case, we remove the inactive PHY listener and connect the Aux PHY to MAC stack A:
+ *
+ *        ┌───┬───┬───┐        ┌────┐       ┌───────┐
+ * Link A │FEM│RSM│CAM│◄─┐ ┌──►│Main├───┐   │Channel│
+ *        │   │   │   │  │ │   │PHY │ ┌─┼──►│   A   │
+ *        └───┴───┴───┘  │ │   └────┘ │ │   └───────┘
+ *                       │ │          │ │
+ *        ┌───┬───┬───┐  │ │   ┌────┐ │ │   ┌───────┐
+ * Link B │FEM│RSM│CAM│◄─┼─┘   │Aux │ │ └──►│Channel│
+ *        │   │   │   │  └────►│PHY ├─┘     │   B   │
+ *        └───┴───┴───┘        └────┘       └───────┘
+ */
+
+void
+StaWifiMac::NotifySwitchingEmlsrLink(Ptr<WifiPhy> phy, uint8_t linkId)
+{
+    NS_LOG_FUNCTION(this << phy << linkId);
+
+    // if any link points to the PHY that switched channel, reset the phy pointer
+    for (auto& [id, link] : GetLinks())
+    {
+        // auto& link = GetStaLink(lnk);
+        if (link->phy == phy)
+        {
+            link->phy = nullptr;
+        }
+    }
+
+    auto& newLink = GetLink(linkId);
+    // The MAC stack associated with the new link uses the given PHY
+    newLink.phy = phy;
+    // Setup a PHY listener for the given PHY on the CAM associated with the new link
+    newLink.channelAccessManager->SetupPhyListener(phy);
+    NS_ASSERT(m_emlsrManager);
+    if (m_emlsrManager->GetCamStateReset())
+    {
+        newLink.channelAccessManager->ResetState();
+    }
+    // Disconnect the FEM on the new link from the current PHY
+    newLink.feManager->ResetPhy();
+    // Connect the FEM on the new link to the given PHY
+    newLink.feManager->SetWifiPhy(phy);
 }
 
 void

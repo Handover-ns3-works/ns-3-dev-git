@@ -29,6 +29,8 @@
 #include "ns3/wifi-psdu.h"
 #include "ns3/wifi-utils.h"
 
+#include <algorithm>
+
 namespace ns3
 {
 
@@ -312,7 +314,7 @@ Time
 HePpdu::GetTxDuration() const
 {
     Time ppduDuration = Seconds(0);
-    const WifiTxVector& txVector = GetTxVector();
+    const auto& txVector = GetTxVector();
     const auto length = m_lSig.GetLength();
     const auto tSymbol = NanoSeconds(12800 + txVector.GetGuardInterval());
     const auto preambleDuration = WifiPhy::CalculatePhyPreambleAndHeaderDuration(txVector);
@@ -413,10 +415,10 @@ HePpdu::GetStaId() const
 }
 
 uint16_t
-HePpdu::GetTransmissionChannelWidth() const
+HePpdu::GetTxChannelWidth() const
 {
-    const WifiTxVector& txVector = GetTxVector();
-    if (txVector.IsUlMu() && GetStaId() != SU_STA_ID)
+    if (const auto& txVector = GetTxVector();
+        txVector.IsValid() && txVector.IsUlMu() && GetStaId() != SU_STA_ID)
     {
         TxPsdFlag flag = GetTxPsdFlag();
         uint16_t ruWidth = HeRu::GetBandwidth(txVector.GetRu(GetStaId()).GetRuType());
@@ -427,7 +429,7 @@ HePpdu::GetTransmissionChannelWidth() const
     }
     else
     {
-        return OfdmPpdu::GetTransmissionChannelWidth();
+        return OfdmPpdu::GetTxChannelWidth();
     }
 }
 

@@ -20,10 +20,58 @@ Release 3-dev
 
 ### New user-visible features
 
+### Bugs fixed
+
+- (lr-wpan) !1673 - Fixes PHY BUSY_RX -> RX_ON operation
+
+Release 3.40
+------------
+
+### Availability
+
+This release is available from:
+<https://www.nsnam.org/release/ns-allinone-3.40.tar.bz2>
+
+### Supported platforms
+
+This release is intended to work on systems with the following minimal
+requirements (Note: not all ns-3 features are available on all systems):
+
+- g++-9 or later, or LLVM/clang++-10 or later
+- Python 3.6 or later
+- CMake 3.10 or later
+- (macOS only) Xcode 11 or later
+- (Windows only) Msys2/MinGW64 toolchain or WSL2
+
+Python API requires [Cppyy](https://cppyy.readthedocs.io/en/latest/installation.html) and works for Linux only.  Specifically, avoid Cppyy version 3; stay with version 2.4.2 for this release.
+
+### New user-visible features
+
+- (core) !1586 - `EmpiricalRandomVariable` CDF pairs can now be added in any order.
+- (energy) !1329 - Extensions to battery discharge module
+- (lr-wpan) !1604 - Add CapabilityField bitmap functions
+- (lr-wpan) !1645 - Add LQI to MlmeAssociateIndicationParams
 - (wifi) Added support for 802.11be TID-to-Link Mapping
-- (energy) - !1329 - Extensions to battery discharge module
+- (wifi) Added a new trace source to WifiPhy to indicate operating channel change
+- (wifi) Improved support for multiple spectrum PHY interfaces
+- (wifi) Added initial support for MU-MIMO (ideal PHY layer only)
 
 ### Bugs fixed
+
+- (antenna) #889 - Improve `WrapTo*` functions
+- (core) #922 - `EmpiricalRandomVariable` no longer requires that a CDF pair with a range value exactly equal to 1.0 be added.
+- (core) #949 - Fix bound callbacks arguments type detection
+- (internet) #956 - Avoid sending RS when link goes down
+- (lr-wpan) !1591 - Removed unnecessary Bcst filter from MAC
+- (lr-wpan) #944 - Fix for-loop in PrintTxQueue(s) functions
+- (lr-wpan) - Fix incorrect return parameter in the MAC MlmeAssociateConfirm
+- (mobility) #943 - Fix node direction change when node is in a corner
+- (wifi) - Reset MU PPDU UID to prevent STA from receiving the TB PPDU sent by another STA
+- (wifi) - Fix max value for UL MCS field of User Info fields (depends on TF variant)
+- (wifi) - Update TXOP bandwidth upon every transmission
+- (wifi) - Fix flush operation on WifiMacQueues
+- (wifi) #942 - Trace expired MPDUs before removing them from the queue to avoid blocking the recipient buffer
+- (wifi) - Fix wrong condition preventing PHY from aborting RX when starting TX
 
 Release 3.39
 ------------
@@ -1227,7 +1275,7 @@ This release has been tested on the following platforms:
 - Bug 2587 - tcp: Avoid overflow in htcp.cc
 - Bug 2590 - traffic-control: Minor enhancements in red-queue-disc{.h, .cc}
 - Bug 2591 - wifi: 802.11e Block Ack cannot be enabled on HT/VHT stations
-- Bug 2594 - wifi: vht-wifi-network very low throughtput at MCS 6, 160 MHz, SGI
+- Bug 2594 - wifi: vht-wifi-network very low throughput at MCS 6, 160 MHz, SGI
 - Bug 2596 - network: EthernetTrailer::GetFcs() should be const
 - Bug 2601 - wifi: HT stations should use 40 MHz width if configured  80 or 160z
 - Bug 2604 - wifi: QosData frames separation with Block Ack enabled

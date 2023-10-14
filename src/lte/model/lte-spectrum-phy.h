@@ -229,7 +229,7 @@ class LteSpectrumPhy : public SpectrumPhy
      *
      * \param a the Antenna Model
      */
-    void SetAntenna(Ptr<AntennaModel> a);
+    void SetAntenna(Ptr<Object> a);
 
     /**
      * Start a transmission of data frame in DL and UL
@@ -484,7 +484,7 @@ class LteSpectrumPhy : public SpectrumPhy
     void SetTxModeGain(uint8_t txMode, double gain);
 
     Ptr<MobilityModel> m_mobility; ///< the modility model
-    Ptr<AntennaModel> m_antenna;   ///< the antenna model
+    Ptr<Object> m_antenna;   ///< the antenna model
     Ptr<NetDevice> m_device;       ///< the device
 
     Ptr<SpectrumChannel> m_channel; ///< the channel

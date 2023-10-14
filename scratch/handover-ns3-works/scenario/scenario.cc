@@ -127,7 +127,7 @@ main(int argc, char* argv[])
     // LogComponentEnable ("A3RsrpHandoverAlgorithm", logLevel);
 
     uint16_t numberOfUes = 1;
-    uint16_t numberOfEnbs = 2;
+    uint16_t numberOfEnbs = 1;
     uint16_t numBearersPerUe = 0;
     double distance = 100.0;                                        // m
     double yForUe = 30.0;                                           // m

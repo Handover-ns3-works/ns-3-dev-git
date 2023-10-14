@@ -378,7 +378,7 @@ LteSpectrumPhy::GetAntenna() const
 }
 
 void
-LteSpectrumPhy::SetAntenna(Ptr<AntennaModel> a)
+LteSpectrumPhy::SetAntenna(Ptr<Object> a)
 {
     NS_LOG_FUNCTION(this << a);
     m_antenna = a;
@@ -447,7 +447,7 @@ LteSpectrumPhy::StartTxDataFrame(Ptr<PacketBurst> pb,
             Create<LteSpectrumSignalParametersDataFrame>();
         txParams->duration = duration;
         txParams->txPhy = GetObject<SpectrumPhy>();
-        txParams->txAntenna = m_antenna;
+        // txParams->txAntenna = m_antenna;
         txParams->psd = m_txPsd;
         txParams->packetBurst = pb;
         txParams->ctrlMsgList = ctrlMsgList;
@@ -503,7 +503,7 @@ LteSpectrumPhy::StartTxDlCtrlFrame(std::list<Ptr<LteControlMessage>> ctrlMsgList
             Create<LteSpectrumSignalParametersDlCtrlFrame>();
         txParams->duration = DL_CTRL_DURATION;
         txParams->txPhy = GetObject<SpectrumPhy>();
-        txParams->txAntenna = m_antenna;
+        // txParams->txAntenna = m_antenna;
         txParams->psd = m_txPsd;
         txParams->cellId = m_cellId;
         txParams->pss = pss;
@@ -559,7 +559,7 @@ LteSpectrumPhy::StartTxUlSrsFrame()
             Create<LteSpectrumSignalParametersUlSrsFrame>();
         txParams->duration = UL_SRS_DURATION;
         txParams->txPhy = GetObject<SpectrumPhy>();
-        txParams->txAntenna = m_antenna;
+        // txParams->txAntenna = m_antenna;
         txParams->psd = m_txPsd;
         txParams->cellId = m_cellId;
         m_channel->StartTx(txParams);

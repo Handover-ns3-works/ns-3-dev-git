@@ -753,6 +753,11 @@ class LteHelper : public Object
     Ptr<Object> m_downlinkPathlossModel;
     /// The path loss model used in the uplink channel.
     Ptr<Object> m_uplinkPathlossModel;
+		/// The path loss model used in the downlink channel.
+		Ptr<Object> m_uplinkSpectrumPropagationLossModel;
+		/// The path loss model used in the uplink channel.
+		Ptr<Object> m_downlinkSpectrumPropagationLossModel;
+		
 
     /// Factory of MAC scheduler object.
     ObjectFactory m_schedulerFactory;

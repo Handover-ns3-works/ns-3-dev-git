@@ -69,6 +69,8 @@
 #include <ns3/trace-fading-loss-model.h>
 #include <ns3/three-gpp-channel-model.h>
 #include <ns3/three-gpp-propagation-loss-model.h>
+#include <ns3/three-gpp-spectrum-propagation-loss-model.h>
+#include <ns3/uniform-planar-array.h>
 
 #include <iostream>
 
@@ -86,9 +88,9 @@ LteHelper::LteHelper()
 {
     NS_LOG_FUNCTION(this);
     m_enbNetDeviceFactory.SetTypeId(LteEnbNetDevice::GetTypeId());
-    m_enbAntennaModelFactory.SetTypeId(IsotropicAntennaModel::GetTypeId());	
+    m_enbAntennaModelFactory.SetTypeId(UniformPlanarArray::GetTypeId());	
     m_ueNetDeviceFactory.SetTypeId(LteUeNetDevice::GetTypeId());
-    m_ueAntennaModelFactory.SetTypeId(IsotropicAntennaModel::GetTypeId());
+    m_ueAntennaModelFactory.SetTypeId(UniformPlanarArray::GetTypeId());
     m_channelFactory.SetTypeId(MultiModelSpectrumChannel::GetTypeId());
 }
 
@@ -243,15 +245,26 @@ LteHelper::ChannelModelInitialization()
 		// ObjectFactory m_channelConditionModelFactory = ObjectFactory();
 		// m_channelConditionModelFactory.SetTypeId(ThreeGppUmiStreetCanyonChannelConditionModel::GetTypeId());
 		// auto channelConditionModel = m_channelConditionModelFactory.Create<ChannelConditionModel>();
-		// auto channelConditionModel = CreateObject<ThreeGppChannelConditionModel>();
+		auto channelConditionModel = CreateObject<ThreeGppUmiStreetCanyonChannelConditionModel>();
 
 		m_downlinkPathlossModel = m_pathlossModelFactory.Create();
-		// DynamicCast<ThreeGppPropagationLossModel>(m_downlinkPathlossModel)->SetChannelConditionModel(channelConditionModel);
+		DynamicCast<ThreeGppPropagationLossModel>(m_downlinkPathlossModel)->SetChannelConditionModel(channelConditionModel);
 		m_downlinkChannel->AddPropagationLossModel(DynamicCast<ThreeGppPropagationLossModel>(m_downlinkPathlossModel));
 
     m_uplinkPathlossModel = m_pathlossModelFactory.Create();
-		// DynamicCast<ThreeGppPropagationLossModel>(m_uplinkPathlossModel)->SetChannelConditionModel(channelConditionModel);
+		DynamicCast<ThreeGppPropagationLossModel>(m_uplinkPathlossModel)->SetChannelConditionModel(channelConditionModel);
 		m_uplinkChannel->AddPropagationLossModel(DynamicCast<ThreeGppPropagationLossModel>(m_downlinkPathlossModel));
+		
+		m_downlinkSpectrumPropagationLossModel = CreateObject<ThreeGppSpectrumPropagationLossModel>();
+		DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_downlinkSpectrumPropagationLossModel)->SetChannelModelAttribute("Scenario", StringValue("UMi-StreetCanyon"));
+		DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_downlinkSpectrumPropagationLossModel)->SetChannelModelAttribute("ChannelConditionModel", PointerValue(channelConditionModel));
+		m_downlinkChannel->AddPhasedArraySpectrumPropagationLossModel(DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_downlinkSpectrumPropagationLossModel));		
+		
+		m_uplinkSpectrumPropagationLossModel = CreateObject<ThreeGppSpectrumPropagationLossModel>();
+		DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_uplinkSpectrumPropagationLossModel)->SetChannelModelAttribute("Scenario", StringValue("UMi-StreetCanyon"));
+		DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_uplinkSpectrumPropagationLossModel)->SetChannelModelAttribute("ChannelConditionModel", PointerValue(channelConditionModel));
+		m_uplinkChannel->AddPhasedArraySpectrumPropagationLossModel(DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_uplinkSpectrumPropagationLossModel));
+		
 		
 		// m_spectrumPropagationFactory.SetTypeId(ThreeGppSpectrumPropagationLossModel::GetTypeId());
     // if (!m_fadingModelType.empty())
@@ -568,7 +581,7 @@ LteHelper::InstallSingleEnbDevice(Ptr<Node> n)
         dlPhy->SetMobility(mm);
         ulPhy->SetMobility(mm);
 
-        Ptr<AntennaModel> antenna = (m_enbAntennaModelFactory.Create())->GetObject<AntennaModel>();
+        Ptr<UniformPlanarArray> antenna = (m_enbAntennaModelFactory.Create())->GetObject<UniformPlanarArray>();
         NS_ASSERT_MSG(antenna, "error in creating the AntennaModel object");
         dlPhy->SetAntenna(antenna);
         ulPhy->SetAntenna(antenna);
@@ -765,6 +778,8 @@ LteHelper::InstallSingleEnbDevice(Ptr<Node> n)
         NS_LOG_LOGIC("DL freq: " << dlFreq);
         bool dlFreqOk =
             m_downlinkPathlossModel->SetAttributeFailSafe("Frequency", DoubleValue(dlFreq));
+				DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_downlinkSpectrumPropagationLossModel)
+						->SetChannelModelAttribute("Frequency", DoubleValue(dlFreq));
         if (!dlFreqOk)
         {
             NS_LOG_WARN("DL propagation model does not have a Frequency attribute");
@@ -775,6 +790,8 @@ LteHelper::InstallSingleEnbDevice(Ptr<Node> n)
         NS_LOG_LOGIC("UL freq: " << ulFreq);
         bool ulFreqOk =
             m_uplinkPathlossModel->SetAttributeFailSafe("Frequency", DoubleValue(ulFreq));
+				DynamicCast<ThreeGppSpectrumPropagationLossModel>(m_uplinkSpectrumPropagationLossModel)
+					->SetChannelModelAttribute("Frequency", DoubleValue(ulFreq));
         if (!ulFreqOk)
         {
             NS_LOG_WARN("UL propagation model does not have a Frequency attribute");
@@ -901,7 +918,7 @@ LteHelper::InstallSingleUeDevice(Ptr<Node> n)
         dlPhy->SetMobility(mm);
         ulPhy->SetMobility(mm);
 
-        Ptr<AntennaModel> antenna = (m_ueAntennaModelFactory.Create())->GetObject<AntennaModel>();
+        Ptr<UniformPlanarArray> antenna = (m_ueAntennaModelFactory.Create())->GetObject<UniformPlanarArray>();
         NS_ASSERT_MSG(antenna, "error in creating the AntennaModel object");
         dlPhy->SetAntenna(antenna);
         ulPhy->SetAntenna(antenna);

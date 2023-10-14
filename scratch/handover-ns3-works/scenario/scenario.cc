@@ -382,8 +382,8 @@ main(int argc, char* argv[])
                     MakeCallback(&NotifyHandoverEndOkEnb));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
                     MakeCallback(&NotifyHandoverEndOkUe));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
-    //                 MakeCallback(&RadioLinkFailureCallback));
+    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
+                    MakeCallback(&RadioLinkFailureCallback));
 
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();
@@ -392,10 +392,10 @@ main(int argc, char* argv[])
     // config.ConfigureAttributes ();
 
     Simulator::Destroy();
-    // std::cout << "RLF count: " << g_RLF_count << std::endl;
-    // for (auto i = g_RLF_time.begin(); i != g_RLF_time.end(); ++i)
-    // {
-    // 	std::cout << "RLF time: " << *i << std::endl;
-    // }
+    std::cout << "RLF count: " << g_RLF_count << std::endl;
+    for (auto i = g_RLF_time.begin(); i != g_RLF_time.end(); ++i)
+    {
+    	std::cout << "RLF time: " << *i << std::endl;
+    }
     return 0;
 }

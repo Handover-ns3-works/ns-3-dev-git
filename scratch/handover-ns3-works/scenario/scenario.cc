@@ -95,6 +95,16 @@ RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, ui
     g_RLF_time.push_back(Simulator::Now().GetSeconds());
 }
 
+double g_HOF_count = 0;
+
+void
+NotifyHandoverFailure(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
+{
+		g_HOF_count++;
+    std::cout << Simulator::Now().As(Time::S) << " " << context << " eNB CellId " << cellid
+              << " IMSI " << imsi << " RNTI " << rnti << " handover failure" << std::endl;
+}
+
 /**
  * Sample simulation script for an automatic X2-based handover based on the RSRQ measures.
  * It instantiates two eNodeB, attaches one UE to the 'source' eNB.
@@ -105,7 +115,7 @@ RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, ui
 int
 main(int argc, char* argv[])
 {
-		Time::SetResolution(Time::US);
+		Time::SetResolution(Time::NS);
 
     // LogComponentEnable ("LteHelper", LOG_LEVEL_ALL);
     // LogComponentEnable ("PropagationLossModel", LOG_LEVEL_ALL);
@@ -126,16 +136,31 @@ main(int argc, char* argv[])
     // LogComponentEnable ("A2A4RsrqHandoverAlgorithm", logLevel);
     // LogComponentEnable ("A3RsrpHandoverAlgorithm", logLevel);
 
-    uint16_t numberOfUes = 1;
+    uint16_t numberOfUes = 10;
     uint16_t numberOfEnbs = 2;
     uint16_t numBearersPerUe = 0;
     double distance = 100.0;                                        // m
-    double yForUe = 30.0;                                           // m
+    // double yForUe = 30.0;                                           // m
     double speed = 20;                                              // m/s
     double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
     double enbTxPowerDbm = 46.0;
-    double hysterisis = 3.0;
-    double timeToTrigger = 0.256;
+    double hysterisis = 3;
+    double timeToTrigger = 256;
+		std::vector<std::vector<double>> Ue_ycoord_angle = {
+			{30, std::atan2(-10.0, 100.0)}, 
+			{29, std::atan2(-30.0, 100.0)}, 
+			{28, std::atan2(10.0, 100.0)}, 
+			{27, std::atan2(20.0, 100.0)},
+			{26, std::atan2(0.0, 100.0)}, 
+			{-30, std::atan2(10.0, 100.0)}, 
+			{-29, std::atan2(30.0, 100.0)}, 
+			{-28, std::atan2(-10.0, 100.0)}, 
+			{-27, std::atan2(-20.0, 100.0)},
+			{-26, std::atan2(0.0, 100.0)}
+		};
+		bool m_useIdealRrc = false;
+		uint32_t m_handoverJoiningTimeout = 200; // ms
+		uint32_t m_handoverLeavingTimeout = 500; // ms
     // std::vector<std::vector<double>> enbPositionInterference = {{-50, 70},
     //                                                             {-50, -50},
     //                                                             {0, 70},
@@ -166,6 +191,9 @@ main(int argc, char* argv[])
     cmd.AddValue("timeToTrigger",
                  "Time to trigger value for A3 handover algorithm (default = 0.256 s)",
                  timeToTrigger);
+		cmd.AddValue("useIdealRrc", "Use ideal RRC (default = false)", m_useIdealRrc);
+		cmd.AddValue("handoverJoiningTimeout", "Handover joining timeout (default = 200 ms)", m_handoverJoiningTimeout);
+		cmd.AddValue("handoverLeavingTimeout", "Handover leaving timeout (default = 500 ms)", m_handoverLeavingTimeout);
 
     cmd.Parse(argc, argv);
 
@@ -182,7 +210,12 @@ main(int argc, char* argv[])
 
     lteHelper->SetHandoverAlgorithmType("ns3::A3RsrpHandoverAlgorithm");
     lteHelper->SetHandoverAlgorithmAttribute("Hysteresis", DoubleValue(hysterisis));
-    lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger", TimeValue(Seconds(timeToTrigger)));
+    lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger", TimeValue(MilliSeconds(timeToTrigger)));
+		lteHelper->SetAttribute("UseIdealRrc", BooleanValue(m_useIdealRrc));
+		Config::SetDefault("ns3::LteEnbRrc::HandoverJoiningTimeoutDuration",
+                       TimeValue(MilliSeconds(m_handoverJoiningTimeout)));
+    Config::SetDefault("ns3::LteEnbRrc::HandoverLeavingTimeoutDuration",
+                       TimeValue(MilliSeconds(m_handoverLeavingTimeout)));
 
     Ptr<Node> pgw = epcHelper->GetPgwNode();
 
@@ -255,8 +288,13 @@ main(int argc, char* argv[])
     MobilityHelper ueMobility;
     ueMobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
     ueMobility.Install(ueNodes);
-    ueNodes.Get(0)->GetObject<MobilityModel>()->SetPosition(Vector(-100, yForUe, 0));
-    ueNodes.Get(0)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(speed, 0, 0));
+		for (uint16_t i = 0; i < numberOfUes; i++)
+		{
+			double direction = Ue_ycoord_angle[i][1];
+			Vector velocityVector(std::cos(direction) * speed, std::sin(direction) * speed, 0.0);
+			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(Vector(0, Ue_ycoord_angle[i][0], 0));
+			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(velocityVector);
+		}
 
     // Install LTE Devices in eNB and UEs
     // lteHelper->SetEnbDeviceAttribute("DlEarfcn", UintegerValue (6250));
@@ -350,8 +388,8 @@ main(int argc, char* argv[])
     propModel->SetAttribute("m0", DoubleValue(1));
     propModel->SetAttribute("m1", DoubleValue(1));
     propModel->SetAttribute("m2", DoubleValue(1));
-    // lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
-    // lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
+    lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
+    lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
 
     // X2-based Handover
     // lteHelper->HandoverRequest (Seconds (8), ueLteDevs.Get (0), enbLteDevs.Get (0),
@@ -360,30 +398,40 @@ main(int argc, char* argv[])
     // Uncomment to enable PCAP tracing
     // p2ph.EnablePcapAll("lena-x2-handover-measures");
 
-    lteHelper->EnablePhyTraces();
-    lteHelper->EnableMacTraces();
-    lteHelper->EnableRlcTraces();
-    lteHelper->EnablePdcpTraces();
-    Ptr<RadioBearerStatsCalculator> rlcStats = lteHelper->GetRlcStats();
-    rlcStats->SetAttribute("EpochDuration", TimeValue(Seconds(1.0)));
-    Ptr<RadioBearerStatsCalculator> pdcpStats = lteHelper->GetPdcpStats();
-    pdcpStats->SetAttribute("EpochDuration", TimeValue(Seconds(1.0)));
+    // lteHelper->EnablePhyTraces();
+    // lteHelper->EnableMacTraces();
+    // lteHelper->EnableRlcTraces();
+    // lteHelper->EnablePdcpTraces();
+    // Ptr<RadioBearerStatsCalculator> rlcStats = lteHelper->GetRlcStats();
+    // rlcStats->SetAttribute("EpochDuration", TimeValue(Seconds(1.0)));
+    // Ptr<RadioBearerStatsCalculator> pdcpStats = lteHelper->GetPdcpStats();
+    // pdcpStats->SetAttribute("EpochDuration", TimeValue(Seconds(1.0)));
 
     // connect custom trace sinks for RRC connection establishment and handover notification
-    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/ConnectionEstablished",
-                    MakeCallback(&NotifyConnectionEstablishedEnb));
-    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/ConnectionEstablished",
-                    MakeCallback(&NotifyConnectionEstablishedUe));
-    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverStart",
-                    MakeCallback(&NotifyHandoverStartEnb));
-    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverStart",
-                    MakeCallback(&NotifyHandoverStartUe));
-    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
-                    MakeCallback(&NotifyHandoverEndOkEnb));
-    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
-                    MakeCallback(&NotifyHandoverEndOkUe));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/ConnectionEstablished",
+    //                 MakeCallback(&NotifyConnectionEstablishedEnb));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/ConnectionEstablished",
+    //                 MakeCallback(&NotifyConnectionEstablishedUe));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverStart",
+    //                 MakeCallback(&NotifyHandoverStartEnb));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverStart",
+    //                 MakeCallback(&NotifyHandoverStartUe));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
+    //                 MakeCallback(&NotifyHandoverEndOkEnb));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
+    //                 MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
+		
+		// Hook a trace sink (the same one) to the four handover failure traces
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",
+                    MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureMaxRach",
+                    MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureLeaving",
+                    MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureJoining",
+                    MakeCallback(&NotifyHandoverFailure));
 
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();
@@ -393,9 +441,10 @@ main(int argc, char* argv[])
 
     Simulator::Destroy();
     std::cout << "RLF count: " << g_RLF_count << std::endl;
-    for (auto i = g_RLF_time.begin(); i != g_RLF_time.end(); ++i)
-    {
-    	std::cout << "RLF time: " << *i << std::endl;
-    }
+    // for (auto i = g_RLF_time.begin(); i != g_RLF_time.end(); ++i)
+    // {
+    // 	std::cout << "RLF time: " << *i << std::endl;
+    // }
+		std::cout << "HOF count: " << g_HOF_count << std::endl;
     return 0;
 }

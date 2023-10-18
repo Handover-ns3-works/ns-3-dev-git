@@ -139,9 +139,9 @@ main(int argc, char* argv[])
     uint16_t numberOfUes = 10;
     uint16_t numberOfEnbs = 2;
     uint16_t numBearersPerUe = 0;
-    double distance = 100.0;                                        // m
+    double distance = 150.0;                                        // m
     // double yForUe = 30.0;                                           // m
-    double speed = 20;                                              // m/s
+    double speed = 10;                                              // m/s
     double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
     double enbTxPowerDbm = 46.0;
     double hysterisis = 3;
@@ -290,8 +290,8 @@ main(int argc, char* argv[])
     ueMobility.Install(ueNodes);
 		for (uint16_t i = 0; i < numberOfUes; i++)
 		{
-			double direction = Ue_ycoord_angle[i][1];
-			Vector velocityVector(std::cos(direction) * speed, std::sin(direction) * speed, 0.0);
+			// double direction = Ue_ycoord_angle[i][1];
+			Vector velocityVector(speed, 0, 0.0);
 			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(Vector(0, Ue_ycoord_angle[i][0], 0));
 			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(velocityVector);
 		}
@@ -408,18 +408,18 @@ main(int argc, char* argv[])
     // pdcpStats->SetAttribute("EpochDuration", TimeValue(Seconds(1.0)));
 
     // connect custom trace sinks for RRC connection establishment and handover notification
-    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/ConnectionEstablished",
-    //                 MakeCallback(&NotifyConnectionEstablishedEnb));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/ConnectionEstablished",
-    //                 MakeCallback(&NotifyConnectionEstablishedUe));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverStart",
-    //                 MakeCallback(&NotifyHandoverStartEnb));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverStart",
-    //                 MakeCallback(&NotifyHandoverStartUe));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
-    //                 MakeCallback(&NotifyHandoverEndOkEnb));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
-    //                 MakeCallback(&NotifyHandoverEndOkUe));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/ConnectionEstablished",
+                    MakeCallback(&NotifyConnectionEstablishedEnb));
+    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/ConnectionEstablished",
+                    MakeCallback(&NotifyConnectionEstablishedUe));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverStart",
+                    MakeCallback(&NotifyHandoverStartEnb));
+    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverStart",
+                    MakeCallback(&NotifyHandoverStartUe));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
+                    MakeCallback(&NotifyHandoverEndOkEnb));
+    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
+                    MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
 		
@@ -432,6 +432,8 @@ main(int argc, char* argv[])
                     MakeCallback(&NotifyHandoverFailure));
     Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureJoining",
                     MakeCallback(&NotifyHandoverFailure));
+		Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
+										MakeCallback(&NotifyHandoverFailure));
 
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();

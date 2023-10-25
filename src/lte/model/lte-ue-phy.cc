@@ -637,7 +637,7 @@ LteUePhy::GenerateCqiRsrpRsrq(const SpectrumValue& sinr)
 
         m_reportCurrentCellRsrpSinrTrace(m_cellId,
                                          m_rnti,
-                                         rsrp,
+                                         10 * log10(rsrp),
                                          avSinr,
                                          (uint16_t)m_componentCarrierId);
         m_rsrpSinrSampleCounter = 0;
@@ -670,9 +670,9 @@ LteUePhy::GenerateCqiRsrpRsrq(const SpectrumValue& sinr)
             NS_ASSERT(rbNum == (*itPss).nRB);
             double rsrq_dB = 10 * log10((*itPss).pssPsdSum / rssiSum);
 
-						// print the RSSI and RSRQ values in db
-						std::cout << Simulator::Now().GetSeconds() << ", " << m_cellId << ", 0, 0, "
-							<< 10 * log10(rssiSum) << ", " << rsrq_dB << ", 0" << std::endl;
+            // print the RSSI and RSRQ values in db
+            // std::cout << Simulator::Now().GetSeconds() << ", " << m_cellId << ", 0, 0, "
+            //     << 10 * log10(rssiSum) << ", " << rsrq_dB << ", 0" << std::endl;
 						
             if (rsrq_dB > m_pssReceptionThreshold)
             {

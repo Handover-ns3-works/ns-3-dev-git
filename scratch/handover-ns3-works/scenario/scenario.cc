@@ -82,8 +82,11 @@ UeStateTransition(uint64_t imsi,
                   LteUeRrc::State oldState,
                   LteUeRrc::State newState)
 {
-    std::cout << Simulator::Now().As(Time::S) << " UE with IMSI " << imsi << " RNTI " << rnti
-              << " connected to cell " << cellId << " transitions from " << ToString(oldState)
+    // std::cout << Simulator::Now().As(Time::S) << " UE with IMSI " << imsi << " RNTI " << rnti
+    //           << " connected to cell " << cellId << " transitions from " << ToString(oldState)
+    //           << " to " << ToString(newState) << std::endl;
+    std::cout << " UE(" << imsi << ")"
+              << " connected to cell(" << cellId << ") transitions from " << ToString(oldState)
               << " to " << ToString(newState) << std::endl;
 }
 
@@ -180,7 +183,7 @@ main(int argc, char* argv[])
      *            						                                  y = yForUe
      */
 
-     /** Second Scenario
+    /** Second Scenario
      * Network topology:
      *
      *                                                                      10m/s
@@ -192,18 +195,20 @@ main(int argc, char* argv[])
      *
      */
 
-
-    uint16_t numberOfUes = 10;    // No. of mobile UEs
-    uint16_t numberOfEnbs = 2;    // No. of eNodeBs
-    uint16_t numBearersPerUe = 0; // No. of bearers per UE
-    double distance = 150.0;      // m
-    double speed = 20;            // m/s
-    double enbTxPowerDbm = 46.0;  // dBm
-    double hysterisis = 3;        // dB
-    double timeToTrigger = 256;   // ms
+    uint16_t numberOfUes = 10;        // No. of mobile UEs
+    uint16_t numberOfEnbs = 5;        // No. of eNodeBs
+    uint16_t numBearersPerUe = 0;     // No. of bearers per UE
+    double interSiteDistance = 150.0; // m
+    double interUEdistance = 30.0;    // m
+    double speed = 20;                // m/s
+    double enbTxPowerDbm = 46.0;      // dBm
+    double hysterisis = 3;            // dB
+    double timeToTrigger = 256;       // ms
     std::vector<double> Ue_ycoord = {30, 29, 28, 27, 26, -30, -29, -28, -27, -26};
-    double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
+    double simTime =
+        (double)(numberOfEnbs + 1) * interSiteDistance / speed; // 1500 m / 20 m/s = 75 secs
 
+    bool isEquallySpaced = true;
     // change some default attributes so that they are reasonable for
     // this scenario, but do this before processing command line
     // arguments, so that the user is allowed to override these settings
@@ -216,6 +221,9 @@ main(int argc, char* argv[])
     cmd.AddValue("simTime", "Total duration of the simulation (in seconds)", simTime);
     cmd.AddValue("speed", "Speed of the UE (default = 20 m/s)", speed);
     cmd.AddValue("enbTxPowerDbm", "TX power [dBm] used by HeNBs (default = 46.0)", enbTxPowerDbm);
+    cmd.AddValue("interSiteDistance",
+                 "Distance between eNBs (default = 150.0 m)",
+                 interSiteDistance);
     cmd.AddValue("hysteresis",
                  "Hysterisis value for A3 handover algorithm (default = 3.0 dB)",
                  hysterisis);
@@ -272,8 +280,8 @@ main(int argc, char* argv[])
     Ptr<ListPositionAllocator> enbPositionAlloc = CreateObject<ListPositionAllocator>();
     for (uint16_t i = 0; i < numberOfEnbs; i++)
     {
-        Vector enbPosition(distance * (i), 0, 0);
-        enbPositionAlloc->Add(enbPosition);
+        // Set distance between eNBs
+        enbPositionAlloc->Add(Vector(interSiteDistance * i, 0, 0));
     }
 
     MobilityHelper enbMobility;
@@ -287,8 +295,18 @@ main(int argc, char* argv[])
     ueMobility.Install(ueNodes);
     for (uint16_t i = 0; i < numberOfUes; i++)
     {
-        ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(
-            Vector(0, Ue_ycoord[i], 0));
+        // Set distance between UEs
+        if (isEquallySpaced)
+        {
+            ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(
+                Vector(0, interUEdistance * i, 0));
+        }
+        else
+        {
+            ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(
+                Vector(0, Ue_ycoord[i], 0));
+        }
+
         ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(
             Vector(speed, 0, 0));
     }
@@ -406,24 +424,24 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverStartUe));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
     //                 MakeCallback(&NotifyHandoverEndOkEnb));
-    Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/LteUeRrc/StateTransition",
-                                  MakeCallback(&UeStateTransition));
+    // Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/LteUeRrc/StateTransition",
+    //                               MakeCallback(&UeStateTransition));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
                     MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
 
     // Hook a trace sink (the same one) to the four handover failure traces
-    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",
-    //                 MakeCallback(&NotifyHandoverFailure));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureMaxRach",
-    //                 MakeCallback(&NotifyHandoverFailure));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureLeaving",
-    //                 MakeCallback(&NotifyHandoverFailure));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureJoining",
-    //                 MakeCallback(&NotifyHandoverFailure));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
-    // 								MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",
+                    MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureMaxRach",
+                    MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureLeaving",
+                    MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureJoining",
+                    MakeCallback(&NotifyHandoverFailure));
+    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
+                    MakeCallback(&NotifyHandoverFailure));
 
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();

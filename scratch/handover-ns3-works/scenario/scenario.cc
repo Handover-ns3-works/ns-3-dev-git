@@ -31,6 +31,62 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("LenaX2HandoverMeasures");
 
+// Global variables
+double g_HO_count = 0;
+double g_RLF_count = 0;
+std::vector<double> g_RLF_time; // List of simulation time when RLF occurs
+double g_HOF_count = 0;
+
+// Helper functions
+
+/// Map each of UE RRC states to its string representation.
+static const std::string g_ueRrcStateName[LteUeRrc::NUM_STATES] = {
+    "IDLE_START",
+    "IDLE_CELL_SEARCH",
+    "IDLE_WAIT_MIB_SIB1",
+    "IDLE_WAIT_MIB",
+    "IDLE_WAIT_SIB1",
+    "IDLE_CAMPED_NORMALLY",
+    "IDLE_WAIT_SIB2",
+    "IDLE_RANDOM_ACCESS",
+    "IDLE_CONNECTING",
+    "CONNECTED_NORMALLY",
+    "CONNECTED_HANDOVER",
+    "CONNECTED_PHY_PROBLEM",
+    "CONNECTED_REESTABLISHING",
+};
+
+/**
+ * \param s The UE RRC state.
+ * \return The string representation of the given state.
+ */
+static const std::string&
+ToString(LteUeRrc::State s)
+{
+    return g_ueRrcStateName[s];
+}
+
+/**
+ * UE state transition tracer.
+ *
+ * \param imsi The IMSI.
+ * \param cellId The Cell ID.
+ * \param rnti The RNTI.
+ * \param oldState The old state.
+ * \param newState The new state.
+ */
+void
+UeStateTransition(uint64_t imsi,
+                  uint16_t cellId,
+                  uint16_t rnti,
+                  LteUeRrc::State oldState,
+                  LteUeRrc::State newState)
+{
+    std::cout << Simulator::Now().As(Time::S) << " UE with IMSI " << imsi << " RNTI " << rnti
+              << " connected to cell " << cellId << " transitions from " << ToString(oldState)
+              << " to " << ToString(newState) << std::endl;
+}
+
 void
 NotifyConnectionEstablishedUe(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
@@ -50,12 +106,10 @@ NotifyHandoverStartUe(std::string context,
               << std::endl;
 }
 
-double g_HO_count = 0;
-
 void
 NotifyHandoverEndOkUe(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
-		g_HO_count++;
+    g_HO_count++;
     // std::cout << context << " UE IMSI " << imsi << ": successful handover to CellId " << cellid
     //           << " with RNTI " << rnti << std::endl;
 }
@@ -85,10 +139,6 @@ NotifyHandoverEndOkEnb(std::string context, uint64_t imsi, uint16_t cellid, uint
               << imsi << " RNTI " << rnti << std::endl;
 }
 
-double g_RLF_count = 0;
-// List of simulation time when RLF occurs
-std::vector<double> g_RLF_time;
-
 void
 RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, uint16_t rnti)
 {
@@ -98,12 +148,10 @@ RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, ui
     g_RLF_time.push_back(Simulator::Now().GetSeconds());
 }
 
-double g_HOF_count = 0;
-
 void
 NotifyHandoverFailure(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
-		g_HOF_count++;
+    g_HOF_count++;
     std::cout << Simulator::Now().As(Time::S) << " " << context << " eNB CellId " << cellid
               << " IMSI " << imsi << " RNTI " << rnti << " handover failure" << std::endl;
 }
@@ -118,19 +166,43 @@ NotifyHandoverFailure(std::string context, uint64_t imsi, uint16_t cellid, uint1
 int
 main(int argc, char* argv[])
 {
-		Time::SetResolution(Time::NS);
+    Time::SetResolution(Time::NS);
 
-    uint16_t numberOfUes = 10;
-    uint16_t numberOfEnbs = 2;
-    uint16_t numBearersPerUe = 0;
-    double distance = 150.0;                                        // m
-    // double yForUe = 30.0;                                           // m
-    double speed = 20;                                              // m/s
-    double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
-    double enbTxPowerDbm = 46.0;
-    double hysterisis = 3;
-    double timeToTrigger = 256;
+    /* Normal Scenario
+     * Network topology:
+     *
+     *      |     + --------------------------------------------------------->
+     *      |     UE
+     *    y |
+     *      | (0, 0, 0)     d                   d
+     *      |     o-------------------x-------------------
+     *          eNodeB              eNodeB											d = distance
+     *            						                                  y = yForUe
+     */
+
+     /** Second Scenario
+     * Network topology:
+     *
+     *                                                                      10m/s
+     * eNB4           eNB3           eNB2           eNB1           eNB0     <-- UE0
+     *                                                                      <-- UE1
+     *   x-------------x--------------x--------------x--------------x       <-- ...
+     *        200m          200m           200m           200m              <-- UE8
+     *                                                                      <-- UE9
+     *
+     */
+
+
+    uint16_t numberOfUes = 10;    // No. of mobile UEs
+    uint16_t numberOfEnbs = 2;    // No. of eNodeBs
+    uint16_t numBearersPerUe = 0; // No. of bearers per UE
+    double distance = 150.0;      // m
+    double speed = 20;            // m/s
+    double enbTxPowerDbm = 46.0;  // dBm
+    double hysterisis = 3;        // dB
+    double timeToTrigger = 256;   // ms
     std::vector<double> Ue_ycoord = {30, 29, 28, 27, 26, -30, -29, -28, -27, -26};
+    double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
 
     // change some default attributes so that they are reasonable for
     // this scenario, but do this before processing command line
@@ -161,7 +233,8 @@ main(int argc, char* argv[])
 
     lteHelper->SetHandoverAlgorithmType("ns3::A3RsrpHandoverAlgorithm");
     lteHelper->SetHandoverAlgorithmAttribute("Hysteresis", DoubleValue(hysterisis));
-    lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger", TimeValue(MilliSeconds(timeToTrigger)));
+    lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger",
+                                             TimeValue(MilliSeconds(timeToTrigger)));
 
     Ptr<Node> pgw = epcHelper->GetPgwNode();
 
@@ -190,18 +263,6 @@ main(int argc, char* argv[])
     // interface 0 is localhost, 1 is the p2p device
     remoteHostStaticRouting->AddNetworkRouteTo(Ipv4Address("7.0.0.0"), Ipv4Mask("255.0.0.0"), 1);
 
-    /*
-     * Network topology:
-     *
-     *      |     + --------------------------------------------------------->
-     *      |     UE
-     *    y |
-     *      | (0, 0, 0)     d                   d
-     *      |     o-------------------x-------------------
-     *          eNodeB              eNodeB											d = distance
-     *            						                                  y = yForUe
-     */
-
     NodeContainer ueNodes;
     NodeContainer enbNodes;
     enbNodes.Create(numberOfEnbs);
@@ -214,7 +275,7 @@ main(int argc, char* argv[])
         Vector enbPosition(distance * (i), 0, 0);
         enbPositionAlloc->Add(enbPosition);
     }
-    
+
     MobilityHelper enbMobility;
     enbMobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     enbMobility.SetPositionAllocator(enbPositionAlloc);
@@ -224,11 +285,13 @@ main(int argc, char* argv[])
     MobilityHelper ueMobility;
     ueMobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
     ueMobility.Install(ueNodes);
-		for (uint16_t i = 0; i < numberOfUes; i++)
-		{
-			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(Vector(0, Ue_ycoord[i], 0));
-			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(speed, 0, 0));
-		}
+    for (uint16_t i = 0; i < numberOfUes; i++)
+    {
+        ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(
+            Vector(0, Ue_ycoord[i], 0));
+        ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(
+            Vector(speed, 0, 0));
+    }
 
     // Install LTE Devices in eNB and UEs
     // lteHelper->SetEnbDeviceAttribute("DlEarfcn", UintegerValue (6250));
@@ -343,12 +406,14 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverStartUe));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
     //                 MakeCallback(&NotifyHandoverEndOkEnb));
+    Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/LteUeRrc/StateTransition",
+                                  MakeCallback(&UeStateTransition));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
                     MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
-		
-		// Hook a trace sink (the same one) to the four handover failure traces
+
+    // Hook a trace sink (the same one) to the four handover failure traces
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",
     //                 MakeCallback(&NotifyHandoverFailure));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureMaxRach",
@@ -357,8 +422,8 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverFailure));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureJoining",
     //                 MakeCallback(&NotifyHandoverFailure));
-		// Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
-		// 								MakeCallback(&NotifyHandoverFailure));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
+    // 								MakeCallback(&NotifyHandoverFailure));
 
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();
@@ -373,6 +438,6 @@ main(int argc, char* argv[])
     // 	std::cout << "RLF time: " << *i << std::endl;
     // }
     std::cout << "HO count: " << g_HO_count << std::endl;
-		std::cout << "HOF count: " << g_HOF_count << std::endl;
+    std::cout << "HOF count: " << g_HOF_count << std::endl;
     return 0;
 }

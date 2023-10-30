@@ -48,7 +48,22 @@ for i in selectedConfigs:
 			##############################################################################################
 			break;
 		
-		# rlf_count = [x.split()[-1] for x in output.split('\n') if 'RLF count: ' in x][0]
+		# RNTIs where the Handover command was recieved when T310 timer was running
+		# Supposed to be reported as a HOF, but NS-3 is configured with an Ideal RRC, so it doesn't happen
+		# This needs to be subtracted from number of HOs, to give actual number of Handovers
+		rlf_rnti = set([x.split()[-1] for x in output.split('\n') if 'T310' in x])
+		handover_rnti = set([x.split()[-1] for x in output.split('\n') if 'Handover' in x])
+		HOF_by_Command = rlf_rnti.intersection(handover_rnti)
+		
+		rlf_count = [x.split()[-1] for x in output.split('\n') if 'RLF count: ' in x][0]
+		ho_count = [x.split()[-1] for x in output.split('\n') if 'HO count: ' in x][0]
+		hof_count = int(rlf_count) + len(HOF_by_Command)
+		
+		# print(rlf_rnti, handover_rnti, HOF_by_Command, rlf_count, ho_count)
+		print("HOF by Command not Recieved: " + str(len(HOF_by_Command)))
+		print("HOF by RLF during TTT: " + str(rlf_count))
+		print("Total Handover Failures: " + str(hof_count))
+		
 		# rlfSumByConfig += int(rlf_count)
 
 		# rlf_times = [x.split()[-1] for x in output.split('\n') if 'RLF time: ' in x]

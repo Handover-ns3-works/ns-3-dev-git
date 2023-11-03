@@ -26,6 +26,7 @@
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/propagation-loss-model.h"
+#include "ns3/channel-condition-model.h"
 
 using namespace ns3;
 
@@ -151,6 +152,10 @@ main(int argc, char* argv[])
     lteHelper->SetHandoverAlgorithmType("ns3::A3RsrpHandoverAlgorithm");
     lteHelper->SetHandoverAlgorithmAttribute("Hysteresis", DoubleValue(hysterisis));
     lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger", TimeValue(MilliSeconds(timeToTrigger)));
+		
+		Ptr<ChannelConditionModel> condModel = CreateObject<ThreeGppUmiStreetCanyonChannelConditionModel> ();
+		lteHelper->SetAttribute ("PathlossModel", StringValue ("ns3::ThreeGppUmiStreetCanyonPropagationLossModel"));
+		lteHelper->SetPathlossModelAttribute ("ChannelConditionModel", PointerValue (condModel));
 
     Ptr<Node> pgw = epcHelper->GetPgwNode();
 

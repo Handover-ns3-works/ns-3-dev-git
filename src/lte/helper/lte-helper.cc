@@ -67,8 +67,6 @@
 #include <ns3/pointer.h>
 #include <ns3/string.h>
 #include <ns3/trace-fading-loss-model.h>
-#include <ns3/three-gpp-channel-model.h>
-#include <ns3/three-gpp-propagation-loss-model.h>
 
 #include <iostream>
 
@@ -86,7 +84,7 @@ LteHelper::LteHelper()
 {
     NS_LOG_FUNCTION(this);
     m_enbNetDeviceFactory.SetTypeId(LteEnbNetDevice::GetTypeId());
-    m_enbAntennaModelFactory.SetTypeId(IsotropicAntennaModel::GetTypeId());	
+    m_enbAntennaModelFactory.SetTypeId(IsotropicAntennaModel::GetTypeId());
     m_ueNetDeviceFactory.SetTypeId(LteUeNetDevice::GetTypeId());
     m_ueAntennaModelFactory.SetTypeId(IsotropicAntennaModel::GetTypeId());
     m_channelFactory.SetTypeId(MultiModelSpectrumChannel::GetTypeId());
@@ -237,30 +235,50 @@ LteHelper::ChannelModelInitialization()
 
     m_downlinkChannel = m_channelFactory.Create<SpectrumChannel>();
     m_uplinkChannel = m_channelFactory.Create<SpectrumChannel>();
-		
-		SetPathlossModelType(ThreeGppUmiStreetCanyonPropagationLossModel::GetTypeId());
-		
-		// ObjectFactory m_channelConditionModelFactory = ObjectFactory();
-		// m_channelConditionModelFactory.SetTypeId(ThreeGppUmiStreetCanyonChannelConditionModel::GetTypeId());
-		// auto channelConditionModel = m_channelConditionModelFactory.Create<ChannelConditionModel>();
-		// auto channelConditionModel = CreateObject<ThreeGppChannelConditionModel>();
 
-		m_downlinkPathlossModel = m_pathlossModelFactory.Create();
-		// DynamicCast<ThreeGppPropagationLossModel>(m_downlinkPathlossModel)->SetChannelConditionModel(channelConditionModel);
-		m_downlinkChannel->AddPropagationLossModel(DynamicCast<ThreeGppPropagationLossModel>(m_downlinkPathlossModel));
+    m_downlinkPathlossModel = m_pathlossModelFactory.Create();
+    Ptr<SpectrumPropagationLossModel> dlSplm =
+        m_downlinkPathlossModel->GetObject<SpectrumPropagationLossModel>();
+    if (dlSplm)
+    {
+        NS_LOG_LOGIC(this << " using a SpectrumPropagationLossModel in DL");
+        m_downlinkChannel->AddSpectrumPropagationLossModel(dlSplm);
+    }
+    else
+    {
+        NS_LOG_LOGIC(this << " using a PropagationLossModel in DL");
+        Ptr<PropagationLossModel> dlPlm =
+            m_downlinkPathlossModel->GetObject<PropagationLossModel>();
+        NS_ASSERT_MSG(dlPlm,
+                      " " << m_downlinkPathlossModel
+                          << " is neither PropagationLossModel nor SpectrumPropagationLossModel");
+        m_downlinkChannel->AddPropagationLossModel(dlPlm);
+    }
 
     m_uplinkPathlossModel = m_pathlossModelFactory.Create();
-		// DynamicCast<ThreeGppPropagationLossModel>(m_uplinkPathlossModel)->SetChannelConditionModel(channelConditionModel);
-		m_uplinkChannel->AddPropagationLossModel(DynamicCast<ThreeGppPropagationLossModel>(m_downlinkPathlossModel));
-		
-		// m_spectrumPropagationFactory.SetTypeId(ThreeGppSpectrumPropagationLossModel::GetTypeId());
-    // if (!m_fadingModelType.empty())
-    // {
-    //     // m_fadingModel = m_fadingModelFactory.Create<SpectrumPropagationLossModel>();
-    //     // m_fadingModel->Initialize();
-    //     m_downlinkChannel->AddSpectrumPropagationLossModel(m_fadingModel);
-    //     m_uplinkChannel->AddSpectrumPropagationLossModel(m_fadingModel);
-    // }
+    Ptr<SpectrumPropagationLossModel> ulSplm =
+        m_uplinkPathlossModel->GetObject<SpectrumPropagationLossModel>();
+    if (ulSplm)
+    {
+        NS_LOG_LOGIC(this << " using a SpectrumPropagationLossModel in UL");
+        m_uplinkChannel->AddSpectrumPropagationLossModel(ulSplm);
+    }
+    else
+    {
+        NS_LOG_LOGIC(this << " using a PropagationLossModel in UL");
+        Ptr<PropagationLossModel> ulPlm = m_uplinkPathlossModel->GetObject<PropagationLossModel>();
+        NS_ASSERT_MSG(ulPlm,
+                      " " << m_uplinkPathlossModel
+                          << " is neither PropagationLossModel nor SpectrumPropagationLossModel");
+        m_uplinkChannel->AddPropagationLossModel(ulPlm);
+    }
+    if (!m_fadingModelType.empty())
+    {
+        m_fadingModel = m_fadingModelFactory.Create<SpectrumPropagationLossModel>();
+        m_fadingModel->Initialize();
+        m_downlinkChannel->AddSpectrumPropagationLossModel(m_fadingModel);
+        m_uplinkChannel->AddSpectrumPropagationLossModel(m_fadingModel);
+    }
 }
 
 void

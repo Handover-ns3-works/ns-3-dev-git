@@ -121,13 +121,12 @@ main(int argc, char* argv[])
 		Time::SetResolution(Time::NS);
 
     uint16_t numberOfUes = 10;
-    uint16_t numberOfEnbs = 2;
+    uint16_t numberOfEnbs = 3;
     uint16_t numBearersPerUe = 0;
-    double distance = 150.0;                                        // m
-    // double yForUe = 30.0;                                           // m
-    double speed = 20;                                              // m/s
-    double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
-    double enbTxPowerDbm = 46.0;
+    double distance = 500.0;                                        // m
+    double speed = 13.88;                                              // m/s
+    double simTime = (double)(1) * distance / speed; // 1500 m / 20 m/s = 75 secs
+    double enbTxPowerDbm = 40.0;
     double hysterisis = 3;
     double timeToTrigger = 256;
     std::vector<double> Ue_ycoord = {30, 29, 28, 27, 26, -30, -29, -28, -27, -26};

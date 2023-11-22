@@ -2,16 +2,15 @@
 import subprocess
 
 # ttt=[0, 0.04, 0.08, 0.1, 0.128, 0.16, 0.256, 0.32, 0.48, 0.572, 0.64, 0.024, 1.28, 2.56, 5.120]
-ttt=[2500, 3100, 3200, 3300, 3400, 4000, 4500, 5000]
-hys = [3 for i in range(0, len(ttt))]
+ttt=[20, 40, 60, 80, 100, 120]
+hys = [9 for i in range(0, len(ttt))]
 # dist = [x for x in range(400, 910, 10)]
 
-args = {
-	"--timeToTrigger": [str(x) for x in ttt],
-	# "--hysteresis": [str(x) for x in hys],
-	# "--distance": [str(x) for x in dist]
-}
-argsStr = [x + "=" + y for x in args.keys() for y in args[x]]
+args = [
+	[f"--timeToTrigger={str(x)}" for x in ttt],
+	[f"--hysteresis={str(x)}" for x in hys]
+]
+argsStr = [" ".join(combination) for combination in zip(*args)]
 
 # number of iterations to run for each configuration
 iterationsPerConfig = 1

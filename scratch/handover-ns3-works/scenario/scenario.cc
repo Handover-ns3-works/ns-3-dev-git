@@ -56,6 +56,7 @@ void
 NotifyHandoverEndOkUe(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
 		g_HO_count++;
+		std::cout << Simulator::Now().GetSeconds() << "\tHandover_ok for RNTI " << rnti << std::endl;
     // std::cout << context << " UE IMSI " << imsi << ": successful handover to CellId " << cellid
     //           << " with RNTI " << rnti << std::endl;
 }
@@ -92,8 +93,7 @@ std::vector<double> g_RLF_time;
 void
 RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, uint16_t rnti)
 {
-    // We can log the current time with Simulator::Now()
-    // NS_LOG_DEBUG("RLF at " << Simulator::Now());
+		std::cout << Simulator::Now().GetSeconds() << "\tRLF occurred for RNTI " << rnti << std::endl;
     g_RLF_count++;
     g_RLF_time.push_back(Simulator::Now().GetSeconds());
 }
@@ -123,9 +123,10 @@ main(int argc, char* argv[])
     uint16_t numberOfUes = 10;
     uint16_t numberOfEnbs = 2;
     uint16_t numBearersPerUe = 0;
-    double distance = 150.0;                                        // m
+    double distance = 100.0;                                        // m
     // double yForUe = 30.0;                                           // m
     double speed = 20;                                              // m/s
+		double angleInDegrees = 0;
     double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
     double enbTxPowerDbm = 46.0;
     double hysterisis = 3;
@@ -151,8 +152,10 @@ main(int argc, char* argv[])
                  "Time to trigger value for A3 handover algorithm (default = 0.256 s)",
                  timeToTrigger);
     cmd.AddValue("numberOfUes", "Number of UEs (default = 10)", numberOfUes);
+		cmd.AddValue("angle", "Angle made by the UEs with the X-Axis (default = 0 degrees)", angleInDegrees);
 
     cmd.Parse(argc, argv);
+		double angleInRadians = angleInDegrees * M_PI / 180.0;
 
     Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
     Ptr<PointToPointEpcHelper> epcHelper = CreateObject<PointToPointEpcHelper>();
@@ -226,8 +229,10 @@ main(int argc, char* argv[])
     ueMobility.Install(ueNodes);
 		for (uint16_t i = 0; i < numberOfUes; i++)
 		{
+			double vx = speed * std::cos(angleInRadians);
+			double vy = speed * std::sin(angleInRadians);
 			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(Vector(0, Ue_ycoord[i], 0));
-			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(speed, 0, 0));
+			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(vx, vy, 0));
 		}
 
     // Install LTE Devices in eNB and UEs
@@ -373,6 +378,6 @@ main(int argc, char* argv[])
     // 	std::cout << "RLF time: " << *i << std::endl;
     // }
     std::cout << "HO count: " << g_HO_count << std::endl;
-		std::cout << "HOF count: " << g_HOF_count << std::endl;
+		// std::cout << "HOF count: " << g_HOF_count << std::endl;
     return 0;
 }

@@ -56,7 +56,7 @@ void
 NotifyHandoverEndOkUe(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
 		g_HO_count++;
-		std::cout << Simulator::Now().GetSeconds() << "\tHandover_ok for RNTI " << rnti << std::endl;
+		std::cout << Simulator::Now().GetSeconds() << "\tHandover_ok for IMSI " << imsi << std::endl;
     // std::cout << context << " UE IMSI " << imsi << ": successful handover to CellId " << cellid
     //           << " with RNTI " << rnti << std::endl;
 }
@@ -93,7 +93,7 @@ std::vector<double> g_RLF_time;
 void
 RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, uint16_t rnti)
 {
-		std::cout << Simulator::Now().GetSeconds() << "\tRLF occurred for RNTI " << rnti << std::endl;
+		std::cout << Simulator::Now().GetSeconds() << "\tRLF occurred for IMSI " << imsi << std::endl;
     g_RLF_count++;
     g_RLF_time.push_back(Simulator::Now().GetSeconds());
 }
@@ -348,8 +348,8 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverStartUe));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
     //                 MakeCallback(&NotifyHandoverEndOkEnb));
-    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
-                    MakeCallback(&NotifyHandoverEndOkUe));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
+    //                 MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
 		
@@ -372,12 +372,12 @@ main(int argc, char* argv[])
     // config.ConfigureAttributes ();
 
     Simulator::Destroy();
-    std::cout << "RLF count: " << g_RLF_count << std::endl;
+    // std::cout << "RLF count: " << g_RLF_count << std::endl;
     // for (auto i = g_RLF_time.begin(); i != g_RLF_time.end(); ++i)
     // {
     // 	std::cout << "RLF time: " << *i << std::endl;
     // }
-    std::cout << "HO count: " << g_HO_count << std::endl;
+    // std::cout << "HO count: " << g_HO_count << std::endl;
 		// std::cout << "HOF count: " << g_HOF_count << std::endl;
     return 0;
 }

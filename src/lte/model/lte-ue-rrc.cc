@@ -2628,6 +2628,7 @@ LteUeRrc::MeasurementReportTriggering(uint8_t measId)
         }
         else
         {
+            std::cout << Simulator::Now().GetSeconds() << "\tTTT running for IMSI " << m_imsi << std::endl;
             PendingTrigger_t t;
             t.measId = measId;
             t.concernedCells = concernedCellsEntry;
@@ -3312,6 +3313,7 @@ LteUeRrc::DoNotifyOutOfSync()
     m_phySyncDetectionTrace(m_imsi, m_rnti, m_cellId, "Notify out of sync", m_noOfSyncIndications);
     if (m_noOfSyncIndications == m_n310)
     {
+        std::cout << Simulator::Now().GetSeconds() << "\tT310 Running for IMSI " << m_imsi << std::endl;
         m_radioLinkFailureDetected =
             Simulator::Schedule(m_t310, &LteUeRrc::RadioLinkFailureDetected, this);
         if (m_radioLinkFailureDetected.IsRunning())

@@ -56,6 +56,7 @@ void
 NotifyHandoverEndOkUe(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
 		g_HO_count++;
+		std::cout << Simulator::Now().GetSeconds() << "\tHandover_ok for IMSI " << imsi << std::endl;
     // std::cout << context << " UE IMSI " << imsi << ": successful handover to CellId " << cellid
     //           << " with RNTI " << rnti << std::endl;
 }
@@ -92,10 +93,19 @@ std::vector<double> g_RLF_time;
 void
 RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, uint16_t rnti)
 {
-    // We can log the current time with Simulator::Now()
-    // NS_LOG_DEBUG("RLF at " << Simulator::Now());
+		std::cout << Simulator::Now().GetSeconds() << "\tRLF occurred for IMSI " << imsi << std::endl;
     g_RLF_count++;
     g_RLF_time.push_back(Simulator::Now().GetSeconds());
+}
+
+double g_HOF_count = 0;
+
+void
+NotifyHandoverFailure(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
+{
+		g_HOF_count++;
+    std::cout << Simulator::Now().As(Time::S) << " " << context << " eNB CellId " << cellid
+              << " IMSI " << imsi << " RNTI " << rnti << " handover failure" << std::endl;
 }
 
 /**
@@ -110,11 +120,13 @@ main(int argc, char* argv[])
 {
 		Time::SetResolution(Time::NS);
 
-    uint16_t numberOfUes = 1;
+    uint16_t numberOfUes = 10;
     uint16_t numberOfEnbs = 2;
     uint16_t numBearersPerUe = 0;
-    double distance = 150.0;                                        // m
+    double distance = 100.0;                                        // m
+    // double yForUe = 30.0;                                           // m
     double speed = 20;                                              // m/s
+		double angleInDegrees = 0;
     double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
     double enbTxPowerDbm = 46.0;
     double hysterisis = 3;
@@ -140,8 +152,10 @@ main(int argc, char* argv[])
                  "Time to trigger value for A3 handover algorithm (default = 0.256 s)",
                  timeToTrigger);
     cmd.AddValue("numberOfUes", "Number of UEs (default = 10)", numberOfUes);
+		cmd.AddValue("angle", "Angle made by the UEs with the X-Axis (default = 0 degrees)", angleInDegrees);
 
     cmd.Parse(argc, argv);
+		double angleInRadians = angleInDegrees * M_PI / 180.0;
 
     Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
     Ptr<PointToPointEpcHelper> epcHelper = CreateObject<PointToPointEpcHelper>();
@@ -215,8 +229,10 @@ main(int argc, char* argv[])
     ueMobility.Install(ueNodes);
 		for (uint16_t i = 0; i < numberOfUes; i++)
 		{
+			double vx = speed * std::cos(angleInRadians);
+			double vy = speed * std::sin(angleInRadians);
 			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(Vector(0, Ue_ycoord[i], 0));
-			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(speed, 0, 0));
+			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(vx, vy, 0));
 		}
 
     // Install LTE Devices in eNB and UEs
@@ -309,8 +325,8 @@ main(int argc, char* argv[])
     propModel->SetAttribute("m0", DoubleValue(1));
     propModel->SetAttribute("m1", DoubleValue(1));
     propModel->SetAttribute("m2", DoubleValue(1));
-    // lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
-    // lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
+    lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
+    lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
 
     // lteHelper->EnablePhyTraces();
 
@@ -325,21 +341,33 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverStartUe));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
     //                 MakeCallback(&NotifyHandoverEndOkEnb));
-    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
-                    MakeCallback(&NotifyHandoverEndOkUe));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
+    //                 MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
 		
+		// Hook a trace sink (the same one) to the four handover failure traces
+    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",
+    //                 MakeCallback(&NotifyHandoverFailure));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureMaxRach",
+    //                 MakeCallback(&NotifyHandoverFailure));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureLeaving",
+    //                 MakeCallback(&NotifyHandoverFailure));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureJoining",
+    //                 MakeCallback(&NotifyHandoverFailure));
+		// Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
+		// 								MakeCallback(&NotifyHandoverFailure));
+
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();
 
     Simulator::Destroy();
-    std::cout << "RLF count: " << g_RLF_count << std::endl;
+    // std::cout << "RLF count: " << g_RLF_count << std::endl;
     // for (auto i = g_RLF_time.begin(); i != g_RLF_time.end(); ++i)
     // {
     // 	std::cout << "RLF time: " << *i << std::endl;
     // }
-    std::cout << "HO count: " << g_HO_count << std::endl;
+    // std::cout << "HO count: " << g_HO_count << std::endl;
 		// std::cout << "HOF count: " << g_HOF_count << std::endl;
     return 0;
 }

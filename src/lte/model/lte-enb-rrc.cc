@@ -830,6 +830,7 @@ UeManager::RecvHandoverRequestAck(EpcX2SapUser::HandoverRequestAckParams params)
                            << " Source eNB CCs = " << m_rrc->m_numberOfComponentCarriers);
         }
     }
+		std::cout << Simulator::Now().GetSeconds() << "\tHandover Command sent for IMSI " << m_imsi << std::endl;
     m_rrc->m_rrcSapUser->SendRrcConnectionReconfiguration(m_rnti, handoverCommand);
     SwitchToState(HANDOVER_LEAVING);
     m_handoverLeavingTimeout = Simulator::Schedule(m_rrc->m_handoverLeavingTimeoutDuration,

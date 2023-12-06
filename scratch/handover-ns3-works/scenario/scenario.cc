@@ -26,6 +26,7 @@
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/propagation-loss-model.h"
+#include "ns3/channel-condition-model.h"
 
 using namespace ns3;
 
@@ -165,7 +166,11 @@ main(int argc, char* argv[])
     lteHelper->SetHandoverAlgorithmType("ns3::A3RsrpHandoverAlgorithm");
     lteHelper->SetHandoverAlgorithmAttribute("Hysteresis", DoubleValue(hysterisis));
     lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger", TimeValue(MilliSeconds(timeToTrigger)));
-
+		
+		Ptr<ChannelConditionModel> condModel = CreateObject<ThreeGppUmaChannelConditionModel> ();
+		lteHelper->SetAttribute ("PathlossModel", StringValue ("ns3::ThreeGppUmaPropagationLossModel"));
+		lteHelper->SetPathlossModelAttribute ("ChannelConditionModel", PointerValue (condModel));
+		
     Ptr<Node> pgw = epcHelper->GetPgwNode();
 
     // Create a single RemoteHost
@@ -321,12 +326,12 @@ main(int argc, char* argv[])
     // Add X2 interface
     lteHelper->AddX2Interface(enbNodes);
 
-    Ptr<NakagamiPropagationLossModel> propModel = CreateObject<NakagamiPropagationLossModel>();
-    propModel->SetAttribute("m0", DoubleValue(1));
-    propModel->SetAttribute("m1", DoubleValue(1));
-    propModel->SetAttribute("m2", DoubleValue(1));
-    lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
-    lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
+    // Ptr<NakagamiPropagationLossModel> propModel = CreateObject<NakagamiPropagationLossModel>();
+    // propModel->SetAttribute("m0", DoubleValue(1));
+    // propModel->SetAttribute("m1", DoubleValue(1));
+    // propModel->SetAttribute("m2", DoubleValue(1));
+    // lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
+    // lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
 
     // lteHelper->EnablePhyTraces();
 

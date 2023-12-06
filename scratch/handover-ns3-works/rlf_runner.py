@@ -1,6 +1,9 @@
 import json
 import csv
 import subprocess
+import argparse
+from tqdm import tqdm
+from concurrent.futures.process import ProcessPoolExecutor
 
 def execute_simulation(ttt, hys, speed, angle):
 	config = f"--timeToTrigger={ttt} --hysteresis={hys} --speed={speed} --angle={angle}"
@@ -14,7 +17,7 @@ def execute_simulation(ttt, hys, speed, angle):
 		["./ns3", "run", '"scratch/handover-ns3-works/scenario/scenario.cc ' + config + '"'],
 		capture_output=True, text=True
 	)
-	output = result.stdout + result.stderr
+	output = result.stdout
 	
 	# RNTIs where the Handover command was recieved when T310 timer was running
 	# Supposed to be reported as a HOF, but NS-3 is configured with an Ideal RRC, so it doesn't happen
@@ -71,6 +74,7 @@ def execute_simulation(ttt, hys, speed, angle):
 		"speed": speed,
 		"angle": angle,
 		"output": output, 
+		"stderr": result.stderr,
 		"rlf_count": rlf_count, 
 		"handover_count": ho_count,
 		"hof_command": hof_com, 
@@ -78,53 +82,59 @@ def execute_simulation(ttt, hys, speed, angle):
 		"hof_total": hof_ttt + hof_com,
 	}
 		
-
-out_dir = "/mnt/d/SNU stuff/Research/Data/Outputs/"
-run_name = input("Enter run name: ")
-
-ttt=[256]
-# ttt=[0, 40, 64, 80, 100, 128, 160, 256, 320, 480, 512, 640, 1024, 1280, 2560, 5120]
-hys = [3]
-# hys = [0.5*i for i in range(0, 31)]
-speed = [20]
-# speed = list(range(10, 101, 10))
-angle = [0]
-# angle = list(range(10, 61, 10))
-
-# number of iterations to run for each configuration
-# iterationsPerConfig = 1
-
-from concurrent.futures.process import ProcessPoolExecutor
-executor = ProcessPoolExecutor()
-sims = []
-
-for t in ttt: 
-	for h in hys:
-		for s in speed:
-			for a in angle:
-				sims.append(executor.submit(execute_simulation, t, h, s, a))	
-
-
-results = [future.result() for future in sims]
-
-# Filter out failed executions
-results = [item for item in results if item is not None]
-
-try:
-	with open(f'{out_dir}{run_name}.json', 'w', encoding='utf-8') as json_file:
-		json.dump(results, json_file, ensure_ascii=False, indent=2)
-
-	keys_to_include = ['ttt', 'hys', 'speed', 'angle', 'handover_count', 'rlf_count', 'hof_command', 'hof_ttt', 'hof_total']
-	with open(f'{out_dir}{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:
-			writer = csv.DictWriter(csv_file, fieldnames=keys_to_include)
-
-			writer.writeheader()
-			for item in results:
-					# Filtering the dictionary to only include the specified keys
-					row = {key: item[key] for key in keys_to_include}
-					writer.writerow(row)
-except Exception as e:
-	print(results)
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description="Command line argument parser")
+	parser.add_argument('run_name', type=str, help='Run Name')
+	parser.add_argument('--ttt', action='store_true', help='Vary ttt')
+	parser.add_argument('--hys', action='store_true', help='Vary hys')
+	parser.add_argument('--speed', action='store_true', help='Vary speed')
+	parser.add_argument('--angle', action='store_true', help='Vary angle')
+	args = parser.parse_args()
 	
+	out_dir = "./"
+	run_name = args.run_name
+	
+	ttt = [0, 40, 64, 80, 100, 128, 160, 256, 320, 480, 512, 640, 1024, 1280, 2560, 5120] if args.ttt else [256]
+	hys = [0.5*i for i in range(0, 31)] if args.hys else [3]
+	speed = list(range(10, 101, 10)) if args.speed else [20]
+	angle = list(range(10, 91, 10)) if args.angle else [0]
+	
+	# number of iterations to run for each configuration
+	# iterationsPerConfig = 1
 
-executor.shutdown()
+	# profile = subprocess.check_output(['./ns3', 'show profile'])
+	# if profile[-1] != 'optimized':
+	# 	subprocess.check_output(['./ns3', 'show profile'])
+	
+	with ProcessPoolExecutor() as executor:
+		sims = []
+
+		for t in ttt: 
+			for h in hys:
+				for s in speed:
+					for a in angle:
+						sims.append(executor.submit(execute_simulation, t, h, s, a))	
+
+
+		# results = [future.result() for future in sims]
+		results = [future.result() for future in tqdm(sims, desc="Processing simulations")]
+
+		# Filter out failed executions
+		results = [item for item in results if item is not None]
+
+		try:
+			with open(f'{out_dir}{run_name}.json', 'w', encoding='utf-8') as json_file:
+				json.dump(results, json_file, ensure_ascii=False, indent=2)
+
+			keys_to_include = ['ttt', 'hys', 'speed', 'angle', 'handover_count', 'rlf_count', 'hof_command', 'hof_ttt', 'hof_total']
+			with open(f'{out_dir}{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:
+					writer = csv.DictWriter(csv_file, fieldnames=keys_to_include)
+
+					writer.writeheader()
+					for item in results:
+							# Filtering the dictionary to only include the specified keys
+							row = {key: item[key] for key in keys_to_include}
+							writer.writerow(row)
+		except Exception as e:
+			print(results)
+		

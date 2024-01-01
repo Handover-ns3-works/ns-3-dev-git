@@ -1610,6 +1610,7 @@ LteUePhy::RlfDetection(double sinrDb)
                                      << " UE synchronized: " << m_downlinkInSync);
     // check for out_of_sync indications first when UE is both DL and UL synchronized
     // m_downlinkInSync=true indicates that the evaluation is for out-of-sync indications
+    // std::cout << "Qin: " << m_qIn << "   Qout: " << m_qOut << std::endl;
     if (m_downlinkInSync && m_numOfSubframes == 10)
     {
         /**

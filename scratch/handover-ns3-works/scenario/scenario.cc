@@ -18,6 +18,7 @@
  */
 
 #include "ns3/applications-module.h"
+#include "ns3/channel-condition-model.h"
 #include "ns3/config-store-module.h"
 #include "ns3/core-module.h"
 #include "ns3/internet-module.h"
@@ -26,7 +27,7 @@
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/propagation-loss-model.h"
-#include "ns3/channel-condition-model.h"
+#include <ns3/lte-ue-phy.h>
 
 using namespace ns3;
 
@@ -56,8 +57,8 @@ double g_HO_count = 0;
 void
 NotifyHandoverEndOkUe(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
-		g_HO_count++;
-		std::cout << Simulator::Now().GetSeconds() << "\tHandover_ok for IMSI " << imsi << std::endl;
+    g_HO_count++;
+    std::cout << Simulator::Now().GetSeconds() << "\tHandover_ok for IMSI " << imsi << std::endl;
     // std::cout << context << " UE IMSI " << imsi << ": successful handover to CellId " << cellid
     //           << " with RNTI " << rnti << std::endl;
 }
@@ -94,7 +95,7 @@ std::vector<double> g_RLF_time;
 void
 RadioLinkFailureCallback(std::string context, uint64_t imsi, uint16_t cellId, uint16_t rnti)
 {
-		std::cout << Simulator::Now().GetSeconds() << "\tRLF occurred for IMSI " << imsi << std::endl;
+    std::cout << Simulator::Now().GetSeconds() << "\tRLF occurred for IMSI " << imsi << std::endl;
     g_RLF_count++;
     g_RLF_time.push_back(Simulator::Now().GetSeconds());
 }
@@ -104,7 +105,7 @@ double g_HOF_count = 0;
 void
 NotifyHandoverFailure(std::string context, uint64_t imsi, uint16_t cellid, uint16_t rnti)
 {
-		g_HOF_count++;
+    g_HOF_count++;
     std::cout << Simulator::Now().As(Time::S) << " " << context << " eNB CellId " << cellid
               << " IMSI " << imsi << " RNTI " << rnti << " handover failure" << std::endl;
 }
@@ -119,19 +120,22 @@ NotifyHandoverFailure(std::string context, uint64_t imsi, uint16_t cellid, uint1
 int
 main(int argc, char* argv[])
 {
-		Time::SetResolution(Time::NS);
+    Time::SetResolution(Time::NS);
 
     uint16_t numberOfUes = 10;
     uint16_t numberOfEnbs = 2;
     uint16_t numBearersPerUe = 0;
-    double distance = 100.0;                                        // m
+    double distance = 100.0; // m
     // double yForUe = 30.0;                                           // m
-    double speed = 20;                                              // m/s
-		double angleInDegrees = 0;
+    double speed = 20; // m/s
+    double angleInDegrees = 0;
     double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
     double enbTxPowerDbm = 46.0;
-    double hysterisis = 3;
+    double hysterisis = 6;
     double timeToTrigger = 256;
+    double qin = -3.5;  // dB
+    double qout = -5.0; // dB
+
     std::vector<double> Ue_ycoord = {30, 29, 28, 27, 26, -30, -29, -28, -27, -26};
 
     // change some default attributes so that they are reasonable for
@@ -140,6 +144,9 @@ main(int argc, char* argv[])
     Config::SetDefault("ns3::UdpClient::Interval", TimeValue(MilliSeconds(10)));
     Config::SetDefault("ns3::UdpClient::MaxPackets", UintegerValue(1000000));
     Config::SetDefault("ns3::LteHelper::UseIdealRrc", BooleanValue(true));
+
+    Config::SetDefault("ns3::LteUePhy::Qin", DoubleValue(qin));
+    Config::SetDefault("ns3::LteUePhy::Qout", DoubleValue(qout));
 
     // Command line arguments
     CommandLine cmd(__FILE__);
@@ -153,10 +160,17 @@ main(int argc, char* argv[])
                  "Time to trigger value for A3 handover algorithm (default = 0.256 s)",
                  timeToTrigger);
     cmd.AddValue("numberOfUes", "Number of UEs (default = 10)", numberOfUes);
-		cmd.AddValue("angle", "Angle made by the UEs with the X-Axis (default = 0 degrees)", angleInDegrees);
+    cmd.AddValue("angle",
+                 "Angle made by the UEs with the X-Axis (default = 0 degrees)",
+                 angleInDegrees);
+
+    // InstallUeDevice -> InstallSingleUeDevice -> GenerateMixedCqiReport -> GenerateCqiRsrpRsrq -> RlfDetection -> m_qIn,m_qOut
+    // How to set global attribute values from cmd: https://www.nsnam.org/docs/manual/html/attributes.html
+    cmd.AddValue("qin", "ns3::LteUePhy::Qin");
+    cmd.AddValue("qout", "ns3::LteUePhy::Qout");
 
     cmd.Parse(argc, argv);
-		double angleInRadians = angleInDegrees * M_PI / 180.0;
+    double angleInRadians = angleInDegrees * M_PI / 180.0;
 
     Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
     Ptr<PointToPointEpcHelper> epcHelper = CreateObject<PointToPointEpcHelper>();
@@ -165,12 +179,15 @@ main(int argc, char* argv[])
 
     lteHelper->SetHandoverAlgorithmType("ns3::A3RsrpHandoverAlgorithm");
     lteHelper->SetHandoverAlgorithmAttribute("Hysteresis", DoubleValue(hysterisis));
-    lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger", TimeValue(MilliSeconds(timeToTrigger)));
-		
-		Ptr<ChannelConditionModel> condModel = CreateObject<ThreeGppUmaChannelConditionModel> ();
-		lteHelper->SetAttribute ("PathlossModel", StringValue ("ns3::ThreeGppUmaPropagationLossModel"));
-		lteHelper->SetPathlossModelAttribute ("ChannelConditionModel", PointerValue (condModel));
-		
+    lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger",
+                                             TimeValue(MilliSeconds(timeToTrigger)));
+
+    // Correlated
+    // Ptr<ChannelConditionModel> condModel = CreateObject<ThreeGppUmaChannelConditionModel> ();
+    // lteHelper->SetAttribute ("PathlossModel", StringValue
+    // ("ns3::ThreeGppUmaPropagationLossModel")); lteHelper->SetPathlossModelAttribute
+    // ("ChannelConditionModel", PointerValue (condModel));
+
     Ptr<Node> pgw = epcHelper->GetPgwNode();
 
     // Create a single RemoteHost
@@ -222,7 +239,7 @@ main(int argc, char* argv[])
         Vector enbPosition(distance * (i), 0, 0);
         enbPositionAlloc->Add(enbPosition);
     }
-    
+
     MobilityHelper enbMobility;
     enbMobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     enbMobility.SetPositionAllocator(enbPositionAlloc);
@@ -232,13 +249,14 @@ main(int argc, char* argv[])
     MobilityHelper ueMobility;
     ueMobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
     ueMobility.Install(ueNodes);
-		for (uint16_t i = 0; i < numberOfUes; i++)
-		{
-			double vx = speed * std::cos(angleInRadians);
-			double vy = speed * std::sin(angleInRadians);
-			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(Vector(0, Ue_ycoord[i], 0));
-			ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(vx, vy, 0));
-		}
+    for (uint16_t i = 0; i < numberOfUes; i++)
+    {
+        double vx = speed * std::cos(angleInRadians);
+        double vy = speed * std::sin(angleInRadians);
+        ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(
+            Vector(0, Ue_ycoord[i], 0));
+        ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(vx, vy, 0));
+    }
 
     // Install LTE Devices in eNB and UEs
     // lteHelper->SetEnbDeviceAttribute("DlEarfcn", UintegerValue (6250));
@@ -326,6 +344,7 @@ main(int argc, char* argv[])
     // Add X2 interface
     lteHelper->AddX2Interface(enbNodes);
 
+    // Rayleigh
     // Ptr<NakagamiPropagationLossModel> propModel = CreateObject<NakagamiPropagationLossModel>();
     // propModel->SetAttribute("m0", DoubleValue(1));
     // propModel->SetAttribute("m1", DoubleValue(1));
@@ -350,8 +369,8 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
-		
-		// Hook a trace sink (the same one) to the four handover failure traces
+
+    // Hook a trace sink (the same one) to the four handover failure traces
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",
     //                 MakeCallback(&NotifyHandoverFailure));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureMaxRach",
@@ -360,8 +379,8 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverFailure));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureJoining",
     //                 MakeCallback(&NotifyHandoverFailure));
-		// Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
-		// 								MakeCallback(&NotifyHandoverFailure));
+    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndError",
+    // 								MakeCallback(&NotifyHandoverFailure));
 
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();
@@ -373,6 +392,6 @@ main(int argc, char* argv[])
     // 	std::cout << "RLF time: " << *i << std::endl;
     // }
     // std::cout << "HO count: " << g_HO_count << std::endl;
-		// std::cout << "HOF count: " << g_HOF_count << std::endl;
+    // std::cout << "HOF count: " << g_HOF_count << std::endl;
     return 0;
 }

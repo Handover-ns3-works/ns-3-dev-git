@@ -1,4 +1,69 @@
-# The Network Simulator, Version 3
+## Handover parameter optimization for LTE/5G networks
+
+### scenario.cc
+We have taken the `lena-x2-handover-measures.cc` example, which demonstrates the X2-based handover mechanism in LTE networks to analyze the performance of handover algorithms and to assess how different thresholds and parameters affect the handover decision-making process. 
+
+We are varying the following parameters:
+- hysteresis
+- time to trigger
+
+and we are measuring the following metrics by adding trace sinks:
+- Radio Link Failure (RLF): from `lte-ue-rrc.cc`, `RadioLinkFailure` trace source
+
+The simulation also lets the user to set various attributes through the commandline:
+- `--hysteresis`: hysteresis value
+- `--timeToTrigger`: time to trigger value
+- `--numberOfUes`: number of UEs in the simulation
+- `--simTime`: simulation time
+- `--speed`: speed of the UEs
+- `--angle`: angle of the UEs
+- `--enbTxPowerDbm`: eNB transmission power
+- `--qin`: q-in value
+- `--qout`: q-out value
+
+This helps us to run the simulation with different parameters without having to recompile the code every time.
+
+### rlf_runner.py
+Tuning each parameter and collecting the data is one of the most important parts of this project as we need to find the optimal values for each parameter and cross-check them with the developed analytical model. This script helps us to automate this process. It runs the simulation with different values of the parameters and collects the data in a CSV file.
+
+This script allows for varying some of the parameters explained above and uses Python's `concurrent.futures` module to run multiple simulations concurrently, improving performance when running a large number of simulations.
+
+#### Usage
+```bash
+python rlf_runner.py  [--ttt] [--hys] [--speed] [--angle] [--qin] [--qout] run_name
+```
+
+The `run_name` argument is required and is used to name the output files. The other arguments are optional and are used to specify which parameters to vary in the simulations. If no arguments are specified, the script will run the simulations for the default values of the parameters.
+
+#### Output
+The script outputs the results of the simulations in both JSON and CSV format. The output files are named using the `run_name` argument and are saved in the `./outputs/` directory.
+
+The output includes the following information for each simulation:
+- ttt
+- hys
+- speed
+- angle
+- handover_count
+- rlf_count
+- hof_command
+- hof_ttt
+- hof_total
+- qin
+- qout
+
+#### Requirements
+This script requires Python 3 and the following Python packages:
+- json
+- csv
+- subprocess
+- argparse
+- concurrent.futures
+
+In addition, the script assumes that the NS-3 network simulator is installed and can be run using the ./ns3 command.
+
+
+<details>
+<summary>The Network Simulator, Version 3 </summary>
 
 [![codecov](https://codecov.io/gh/nsnam/ns-3-dev-git/branch/master/graph/badge.svg)](https://codecov.io/gh/nsnam/ns-3-dev-git/branch/master/)
 [![Gitlab CI](https://gitlab.com/nsnam/ns-3-dev/badges/master/pipeline.svg)](https://gitlab.com/nsnam/ns-3-dev/-/pipelines)
@@ -211,3 +276,5 @@ listing third-party modules for ns-3 available on the Internet.
 
 More information on how to submit an ns-3 module to the ns-3 App Store is available
 in the [ns-3 App Store documentation](https://www.nsnam.org/docs/contributing/html/external.html).
+
+</details>

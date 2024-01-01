@@ -521,6 +521,13 @@ LteHelper::InstallSingleEnbDevice(Ptr<Node> n)
         m_handoverAlgorithmFactory.Create<LteHandoverAlgorithm>();
 
     NS_ABORT_MSG_IF(!m_componentCarrierPhyParams.empty(), "CC map is not clean");
+    // std::cout << std::endl;
+    // std::cout << std::endl;
+    // std::cout << "Single Enb Device" << std::endl;
+    // std::cout << "UL EARFCN: " << dev->GetUlEarfcn() << std::endl;
+    // std::cout << "DL EARFCN: " << dev->GetDlEarfcn() << std::endl;
+    // std::cout << "UL BW: " << dev->GetUlBandwidth() << std::endl;
+    // std::cout << "DL BW: " << dev->GetDlBandwidth() << std::endl;
     DoComponentCarrierConfigure(dev->GetUlEarfcn(),
                                 dev->GetDlEarfcn(),
                                 dev->GetUlBandwidth(),
@@ -780,6 +787,7 @@ LteHelper::InstallSingleEnbDevice(Ptr<Node> n)
             MakeCallback(&LteEnbPhy::ReportUlHarqFeedback, ccPhy));
         NS_LOG_LOGIC("set the propagation model frequencies");
         double dlFreq = LteSpectrumValueHelper::GetCarrierFrequency(it->second->GetDlEarfcn());
+        // std::cout << "DL freq: " << dlFreq << std::endl;
         NS_LOG_LOGIC("DL freq: " << dlFreq);
         bool dlFreqOk =
             m_downlinkPathlossModel->SetAttributeFailSafe("Frequency", DoubleValue(dlFreq));
@@ -789,6 +797,7 @@ LteHelper::InstallSingleEnbDevice(Ptr<Node> n)
         }
 
         double ulFreq = LteSpectrumValueHelper::GetCarrierFrequency(it->second->GetUlEarfcn());
+        // std::cout << "UL freq: " << ulFreq << std::endl;
 
         NS_LOG_LOGIC("UL freq: " << ulFreq);
         bool ulFreqOk =
@@ -847,6 +856,11 @@ LteHelper::InstallSingleUeDevice(Ptr<Node> n)
                                     << ")");
     std::map<uint8_t, Ptr<ComponentCarrierUe>> ueCcMap;
 
+    // std::cout << std::endl;
+    // std::cout << std::endl;
+    // std::cout << "Single UE Device" << std::endl;
+    // std::cout << "DL EARFCN: " << dev->GetDlEarfcn() << std::endl;
+    
     for (auto it = m_componentCarrierPhyParams.begin(); it != m_componentCarrierPhyParams.end();
          ++it)
     {

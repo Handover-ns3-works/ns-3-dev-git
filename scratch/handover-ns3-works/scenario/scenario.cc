@@ -27,8 +27,6 @@
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/propagation-loss-model.h"
-#include <ns3/lte-ue-phy.h>
-
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("LenaX2HandoverMeasures");
@@ -127,15 +125,12 @@ main(int argc, char* argv[])
     uint16_t numBearersPerUe = 0;
     double distance = 100.0; // m
     // double yForUe = 30.0;                                           // m
-    double speed = 20; // m/s
-    double angleInDegrees = 0;
+    double speed = 20, angleInDegrees = 0;
     double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
     double enbTxPowerDbm = 46.0;
-    double hysterisis = 6;
-    double timeToTrigger = 256;
-    double qin = -3.5;  // dB
-    double qout = -5.0; // dB
-
+    double hysterisis = 3, timeToTrigger = 256;
+    double Qout = -5, Qin = -3.9;
+    double T310 = 1000, N310 = 6, N311 = 2;
     std::vector<double> Ue_ycoord = {30, 29, 28, 27, 26, -30, -29, -28, -27, -26};
 
     // change some default attributes so that they are reasonable for
@@ -144,9 +139,6 @@ main(int argc, char* argv[])
     Config::SetDefault("ns3::UdpClient::Interval", TimeValue(MilliSeconds(10)));
     Config::SetDefault("ns3::UdpClient::MaxPackets", UintegerValue(1000000));
     Config::SetDefault("ns3::LteHelper::UseIdealRrc", BooleanValue(true));
-
-    Config::SetDefault("ns3::LteUePhy::Qin", DoubleValue(qin));
-    Config::SetDefault("ns3::LteUePhy::Qout", DoubleValue(qout));
 
     // Command line arguments
     CommandLine cmd(__FILE__);
@@ -160,14 +152,12 @@ main(int argc, char* argv[])
                  "Time to trigger value for A3 handover algorithm (default = 0.256 s)",
                  timeToTrigger);
     cmd.AddValue("numberOfUes", "Number of UEs (default = 10)", numberOfUes);
-    cmd.AddValue("angle",
-                 "Angle made by the UEs with the X-Axis (default = 0 degrees)",
-                 angleInDegrees);
-
-    // InstallUeDevice -> InstallSingleUeDevice -> GenerateMixedCqiReport -> GenerateCqiRsrpRsrq -> RlfDetection -> m_qIn,m_qOut
-    // How to set global attribute values from cmd: https://www.nsnam.org/docs/manual/html/attributes.html
-    cmd.AddValue("qin", "ns3::LteUePhy::Qin");
-    cmd.AddValue("qout", "ns3::LteUePhy::Qout");
+		cmd.AddValue("angle", "Angle made by the UEs with the X-Axis (default = 0 degrees)", angleInDegrees);
+		cmd.AddValue("Qout", "Qout value for lte-ue-phy (default = -5 dB)", Qout);
+		cmd.AddValue("Qin", "Qin value for lte-ue-phy (default = -3.9 dB)", Qin);
+		cmd.AddValue("T310", "T310 value for lte-ue-rrc (default = 1000 ms)", T310);
+		cmd.AddValue("N310", "N310 value for lte-ue-phy (default = 6)", N310);
+		cmd.AddValue("N311", "N311 value for lte-ue-phy (default = 2)", N311);
 
     cmd.Parse(argc, argv);
     double angleInRadians = angleInDegrees * M_PI / 180.0;
@@ -263,6 +253,14 @@ main(int argc, char* argv[])
     // lteHelper->SetUeDeviceAttribute("DlEarfcn", UintegerValue (6250));
     lteHelper->SetAttribute("UsePdschForCqiGeneration", BooleanValue(false));
     Config::SetDefault("ns3::LteEnbPhy::TxPower", DoubleValue(enbTxPowerDbm));
+		
+		// How to set global attribute values from cmd: https://www.nsnam.org/docs/manual/html/attributes.html
+		Config::SetDefault("ns3::LteUePhy::Qout", DoubleValue(Qout));
+		Config::SetDefault("ns3::LteUePhy::Qin", DoubleValue(Qin));
+		Config::SetDefault("ns3::LteUeRrc::T310", TimeValue(MilliSeconds(T310)));
+		Config::SetDefault("ns3::LteUeRrc::N310", UintegerValue(N310));
+		Config::SetDefault("ns3::LteUeRrc::N311", UintegerValue(N311));
+		
     NetDeviceContainer enbLteDevs = lteHelper->InstallEnbDevice(enbNodes);
     // Change the txPower for just the interference nodes
     // Config::SetDefault("ns3::LteEnbPhy::TxPower", DoubleValue(20.0));

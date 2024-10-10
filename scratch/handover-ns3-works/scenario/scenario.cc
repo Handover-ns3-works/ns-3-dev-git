@@ -132,6 +132,8 @@ main(int argc, char* argv[])
     double Qout = -5, Qin = -3.9;
     double T310 = 1000, N310 = 6, N311 = 2;
     std::vector<double> Ue_ycoord = {30, 29, 28, 27, 26, -30, -29, -28, -27, -26};
+		// 0 = DETERMINISTIC, 1 = RAYLEIGH, 2 = CORRELATED
+		double fadingModel = 0;
 
     // change some default attributes so that they are reasonable for
     // this scenario, but do this before processing command line
@@ -158,6 +160,7 @@ main(int argc, char* argv[])
 		cmd.AddValue("T310", "T310 value for lte-ue-rrc (default = 1000 ms)", T310);
 		cmd.AddValue("N310", "N310 value for lte-ue-phy (default = 6)", N310);
 		cmd.AddValue("N311", "N311 value for lte-ue-phy (default = 2)", N311);
+		cmd.AddValue("fadingModel", "Fading model to be used (default = DETERMINISTIC)", fadingModel);
 
     cmd.Parse(argc, argv);
     double angleInRadians = angleInDegrees * M_PI / 180.0;
@@ -173,10 +176,13 @@ main(int argc, char* argv[])
                                              TimeValue(MilliSeconds(timeToTrigger)));
 
     // Correlated
-    // Ptr<ChannelConditionModel> condModel = CreateObject<ThreeGppUmaChannelConditionModel> ();
-    // lteHelper->SetAttribute ("PathlossModel", StringValue
-    // ("ns3::ThreeGppUmaPropagationLossModel")); lteHelper->SetPathlossModelAttribute
-    // ("ChannelConditionModel", PointerValue (condModel));
+		if( fadingModel == 2 ) {
+			std::cout << "Using Correlated fading model" << std::endl;
+			Ptr<ChannelConditionModel> condModel = CreateObject<ThreeGppUmaChannelConditionModel> ();
+			lteHelper->SetAttribute ("PathlossModel", StringValue
+			("ns3::ThreeGppUmaPropagationLossModel")); lteHelper->SetPathlossModelAttribute
+			("ChannelConditionModel", PointerValue (condModel));
+		}
 
     Ptr<Node> pgw = epcHelper->GetPgwNode();
 
@@ -342,13 +348,15 @@ main(int argc, char* argv[])
     // Add X2 interface
     lteHelper->AddX2Interface(enbNodes);
 
-    // Rayleigh
-    // Ptr<NakagamiPropagationLossModel> propModel = CreateObject<NakagamiPropagationLossModel>();
-    // propModel->SetAttribute("m0", DoubleValue(1));
-    // propModel->SetAttribute("m1", DoubleValue(1));
-    // propModel->SetAttribute("m2", DoubleValue(1));
-    // lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
-    // lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
+    if( fadingModel == 1 ) {
+			std::cout << "Using Rayleigh fading model" << std::endl;
+			Ptr<NakagamiPropagationLossModel> propModel = CreateObject<NakagamiPropagationLossModel>();
+			propModel->SetAttribute("m0", DoubleValue(1));
+			propModel->SetAttribute("m1", DoubleValue(1));
+			propModel->SetAttribute("m2", DoubleValue(1));
+			lteHelper->GetDownlinkSpectrumChannel()->AddPropagationLossModel(propModel);
+			lteHelper->GetUplinkSpectrumChannel()->AddPropagationLossModel(propModel);
+		}
 
     // lteHelper->EnablePhyTraces();
 
@@ -363,8 +371,8 @@ main(int argc, char* argv[])
     //                 MakeCallback(&NotifyHandoverStartUe));
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverEndOk",
     //                 MakeCallback(&NotifyHandoverEndOkEnb));
-    // Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
-    //                 MakeCallback(&NotifyHandoverEndOkUe));
+    Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverEndOk",
+                    MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
 

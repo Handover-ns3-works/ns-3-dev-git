@@ -156,9 +156,15 @@ if __name__ == "__main__":
 	# number of iterations to run for each configuration
 	# iterationsPerConfig = 1
 
-	# profile = subprocess.check_output(['./ns3', 'show profile'])
-	# if profile[-1] != 'optimized':
-	# 	subprocess.check_output(['./ns3', 'show profile'])
+	profile = subprocess.check_output(['./ns3', 'show', 'profile'])
+	if 'optimized' in profile.decode('utf-8'):
+		print("Running optimized profile")
+	else:
+		print("Configuring optimized profile")
+		subprocess.run(['./ns3', 'configure', '--build-profile=optimized', '--out=build/optimized'])
+	
+	print("Building NS-3")
+	subprocess.run(['./ns3', 'build'])
 	
 	with ProcessPoolExecutor() as executor:
 		sims = []

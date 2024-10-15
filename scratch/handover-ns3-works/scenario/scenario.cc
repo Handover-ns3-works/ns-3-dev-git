@@ -129,11 +129,14 @@ main(int argc, char* argv[])
     double simTime = (double)(numberOfEnbs + 1) * distance / speed; // 1500 m / 20 m/s = 75 secs
     double enbTxPowerDbm = 46.0;
     double hysterisis = 3, timeToTrigger = 256;
+		double servingCellThreshold = 30, neighbourCellOffset = 1;
     double Qout = -5, Qin = -3.9;
     double T310 = 1000, N310 = 6, N311 = 2;
     std::vector<double> Ue_ycoord = {30, 29, 28, 27, 26, -30, -29, -28, -27, -26};
 		// 0 = DETERMINISTIC, 1 = RAYLEIGH, 2 = CORRELATED
 		double fadingModel = 0;
+		// 0 = A3, 1 = A2A4
+		double handoverAlgorithm = 0;
 
     // change some default attributes so that they are reasonable for
     // this scenario, but do this before processing command line
@@ -153,6 +156,8 @@ main(int argc, char* argv[])
     cmd.AddValue("timeToTrigger",
                  "Time to trigger value for A3 handover algorithm (default = 0.256 s)",
                  timeToTrigger);
+		cmd.AddValue("servingCellThreshold", "Serving Cell Threshold for A2A4 handover algorithm (default = 30)", servingCellThreshold);
+		cmd.AddValue("neighbourCellOffset", "Neighbour Cell Offset for A2A4 handover algorithm (default = 1)", neighbourCellOffset);
     cmd.AddValue("numberOfUes", "Number of UEs (default = 10)", numberOfUes);
 		cmd.AddValue("angle", "Angle made by the UEs with the X-Axis (default = 0 degrees)", angleInDegrees);
 		cmd.AddValue("Qout", "Qout value for lte-ue-phy (default = -5 dB)", Qout);
@@ -161,6 +166,7 @@ main(int argc, char* argv[])
 		cmd.AddValue("N310", "N310 value for lte-ue-phy (default = 6)", N310);
 		cmd.AddValue("N311", "N311 value for lte-ue-phy (default = 2)", N311);
 		cmd.AddValue("fadingModel", "Fading model to be used (default = DETERMINISTIC)", fadingModel);
+		cmd.AddValue("handoverAlgorithm", "Handover algorithm to be used (default = A3)", handoverAlgorithm);
 
     cmd.Parse(argc, argv);
     double angleInRadians = angleInDegrees * M_PI / 180.0;
@@ -170,10 +176,16 @@ main(int argc, char* argv[])
     lteHelper->SetEpcHelper(epcHelper);
     lteHelper->SetSchedulerType("ns3::RrFfMacScheduler");
 
-    lteHelper->SetHandoverAlgorithmType("ns3::A3RsrpHandoverAlgorithm");
-    lteHelper->SetHandoverAlgorithmAttribute("Hysteresis", DoubleValue(hysterisis));
-    lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger",
-                                             TimeValue(MilliSeconds(timeToTrigger)));
+		if( handoverAlgorithm == 0 ) {
+			lteHelper->SetHandoverAlgorithmType("ns3::A3RsrpHandoverAlgorithm");
+			lteHelper->SetHandoverAlgorithmAttribute("Hysteresis", DoubleValue(hysterisis));
+			lteHelper->SetHandoverAlgorithmAttribute("TimeToTrigger",
+																							TimeValue(MilliSeconds(timeToTrigger)));
+		} else {
+			lteHelper->SetHandoverAlgorithmType("ns3::A2A4RsrqHandoverAlgorithm");
+			lteHelper->SetHandoverAlgorithmAttribute("ServingCellThreshold", UintegerValue(servingCellThreshold));
+			lteHelper->SetHandoverAlgorithmAttribute("NeighbourCellOffset", UintegerValue(neighbourCellOffset));
+		}															
 
     // Correlated
 		if( fadingModel == 2 ) {

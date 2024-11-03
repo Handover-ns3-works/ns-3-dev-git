@@ -23,6 +23,12 @@ The simulation also lets the user to set various attributes through the commandl
 
 This helps us to run the simulation with different parameters without having to recompile the code every time.
 
+#### Computing d_{RLF} (distance at which RLF occurs)
+1. Run scenario.cc with specified HO and RLF parameter values
+2. From the output save the time instant at which T310 timer expires and RLF is declared
+3. Multiply the time with velocity to compute d_{RLF}
+4. Average the computed values over all trajectories mentioned in the manuscript.
+
 ### rlf_runner.py
 Tuning each parameter and collecting the data is one of the most important parts of this project as we need to find the optimal values for each parameter and cross-check them with the developed analytical model. This script helps us to automate this process. It runs the simulation with different values of the parameters and collects the data in a CSV file.
 
@@ -71,15 +77,25 @@ In addition, the script assumes that the NS-3 network simulator is installed and
 
 ## Table of Contents
 
-* [Overview](#overview-an-open-source-project)
-* [Building ns-3](#building-ns-3)
-* [Testing ns-3](#testing-ns-3)
-* [Running ns-3](#running-ns-3)
-* [ns-3 Documentation](#ns-3-documentation)
-* [Working with the Development Version of ns-3](#working-with-the-development-version-of-ns-3)
-* [Contributing to ns-3](#contributing-to-ns-3)
-* [Reporting Issues](#reporting-issues)
-* [ns-3 App Store](#ns-3-app-store)
+- [Handover parameter optimization for LTE/5G networks](#handover-parameter-optimization-for-lte5g-networks)
+	- [scenario.cc](#scenariocc)
+		- [Computing d\_{RLF} (distance at which RLF occurs)](#computing-d_rlf-distance-at-which-rlf-occurs)
+	- [rlf\_runner.py](#rlf_runnerpy)
+		- [Usage](#usage)
+		- [Output](#output)
+		- [Requirements](#requirements)
+- [Table of Contents](#table-of-contents)
+- [Overview: An Open Source Project](#overview-an-open-source-project)
+- [Building ns-3](#building-ns-3)
+	- [Supported Platforms](#supported-platforms)
+- [Testing ns-3](#testing-ns-3)
+- [Running ns-3](#running-ns-3)
+- [Running ns-3 from Python](#running-ns-3-from-python)
+- [ns-3 Documentation](#ns-3-documentation)
+- [Working with the Development Version of ns-3](#working-with-the-development-version-of-ns-3)
+- [Contributing to ns-3](#contributing-to-ns-3)
+- [Reporting Issues](#reporting-issues)
+- [ns-3 App Store](#ns-3-app-store)
 
 > **NOTE**: Much more substantial information about ns-3 can be found at
 <https://www.nsnam.org>

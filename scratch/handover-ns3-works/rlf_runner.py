@@ -1,3 +1,4 @@
+import os
 import json
 import csv
 import subprocess
@@ -13,21 +14,144 @@ class FadingModel(Enum):
 	RAYLEIGH = 1
 	CORRELATED = 2
 	
-class Handover(Enum):
+class HandoverAlgorithmType(Enum):
 	A3_RSRP = 0
 	A2A4_RSRQ = 1
 
-def execute_simulation(ttt, hys, servingCellThreshold, neighbourCellOffset, speed, angle, q_out, q_in, t_310, n_310, n_311, fading_model, handover_algorithm, enbCoordinates):
-	enbCoordinatesString = ",".join([str(x) for x in enbCoordinates])
-	config = f"--timeToTrigger={ttt} --hysteresis={hys} --servingCellThreshold={servingCellThreshold} --neighbourCellOffset={neighbourCellOffset} --speed={speed} --angle={angle}--Qout={q_out} --Qin={q_in} --T310={t_310} --N310={n_310} --N311={n_311} --fadingModel={fading_model.value} --handoverAlgorithm={handover_algorithm.value} --enbCoordinates={enbCoordinatesString}"
+def parse_args():
+	# Default run values, change if needed	
+	config_map = {
+		"simTime": {
+			"type": "float",
+			"values": [15],
+			"help": "Vary the simulation time in seconds. Default: 15. Example: --simTime 10 15 20 30 60",
+		},
+		"iterationsPerConfig": {
+			"type": "int",
+			"values": 1,
+			"ignoreNs3Arg": True,
+			"help": "Vary the number of iterations per configuration. Default: 1. Example: --iterationsPerConfig 5",			
+		},
+		"ignoreColumnOutput": {
+			"type": "str",
+			"values": [],
+			"ignoreNs3Arg": True,
+			"help": "Ignore the column output. Default: []. Example: --ignoreColumnOutput hysterisis servingCellThreshold",
+		},
+		"timeToTrigger": {
+			"type": "int",
+			"values": [256],
+			"help": "Vary the time to trigger in ms. Default: 256. Example: --timeToTrigger 0 40 64 80 100 128 160 256 320 480 512 640 1024 1280 2560 5120",
+		},
+		"hysteresis": {
+			"type": "float",
+			"values": [3],
+			"help": "Vary the hysteresis in dB. Default: 3. Example: --hysteresis 0.5 1 1.5 2 2.5 3 3.5 4 4.5 5 5.5 6",
+		},
+		"servingCellThreshold": {
+			"type": "int",
+			"values": [30],
+			"help": "Vary the serving cell threshold in dB. Default: 30. Example: --servingCellThreshold 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29",
+		},
+		"neighbourCellOffset": {
+			"type": "int",
+			"values": [1],
+			"help": "Vary the neighbour cell offset in dB. Default: 1. Example: --neighbourCellOffset 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20",
+		},
+		"speed": {
+			"type": "int",
+			"values": [20],
+			"help": "Vary the UE speed in km/h. Default: 20. Example: --speed 10 20 30 40 50 60 70 80 90 100",
+		},
+		"angle": {
+			"type": "int",
+			"values": [0],
+			"help": "Vary the UE speed in degrees. Default: 0. Example: --angle 10 20 30 40 50 60 70 80 90",
+		},
+		"Qout": {
+			"type": "float",
+			"values": [-5],
+			"help": "Vary the Qout in dB. Default: -5. Example: --Qout -6 -5.5 -5 -4.5 -4 -3.5 -3",
+		},
+		"Qin": {
+			"type": "float",
+			"values": [-3.9],
+			"help": "Vary the Qin in dB. Default: -3.9. Example: --Qin -4 -3.5 -3 -2.5 -2 -1.5 -1",
+		},
+		"T310": {
+			"type": "int",
+			"values": [1000],
+			"help": "Vary the T310 timer in ms. Default: 1000. Example: --T310 0 50 100 200 500 1000 2000",
+		},
+		"N310": {
+			"type": "int",
+			"values": [6],
+			"help": "Vary the N310 timer in ms. Default: 6. Example: --N310 1 2 3 4 5 6 8 10 20",
+		},
+		"N311": {
+			"type": "int",
+			"values": [2],
+			"help": "Vary the N311 timer in ms. Default: 2. Example: --N311 1 2 3 4 5 6 8 10",
+		},
+		"fadingModel": {
+			"type": "FadingModel",
+			"values": [FadingModel.DETERMINISTIC],
+			"convertToValue": lambda x: x.value,
+			"help": "Vary the fading model. Default: DETERMINISTIC. Example: --fadingModel DETERMINISTIC RAYLEIGH CORRELATED",
+		},
+		"handoverAlgorithm": {
+			"type": "HandoverAlgorithmType",
+			"values": [HandoverAlgorithmType.A3_RSRP],
+			"convertToValue": lambda x: x.value,
+			"help": "Vary the handover algorithm. Default: A3_RSRP. Example: --handoverAlgorithm A3_RSRP A2A4_RSRQ",
+		},
+	}
 	
-	# This requires handling of batch results
-	# for j in range(1, iterationsPerConfig+1):
-	# print("Running iteration " + str(j))
+	parser = argparse.ArgumentParser(description="Command line argument parser")
+	parser.add_argument('run_name', type=str, help='Run Name')
+	parser.add_argument('-o', '--out_dir', type=str, help='Output directory', default="./results/")
+	parser.add_argument('-d', '--debug', action='store_true', help='Debug mode', default=False)
+	for key, value in config_map.items():
+		parser.add_argument(
+			f'--{key}', 
+			type=eval(value["type"]),
+			nargs='*' if isinstance(value["values"], list) else None,
+			default=value["values"],
+			help=value["help"]
+		)
 	
+	args = parser.parse_args()
+	# map the args to values in config_map
+	for key, value in args.__dict__.items():
+			# ignore the run_name and out_dir
+			if key not in config_map:
+					continue
+			
+			# itertools.product doesn't work with non-iterables
+			if not isinstance(value, list):
+					value = [value]
+					
+			config_map[key]["values"] = value
+	
+	return args.run_name, args.out_dir, args.debug, config_map
+
+def configure_optimized():
+	# Check if we are running the optimized profile
+	profile = subprocess.check_output(['./ns3', 'show', 'profile'])
+	if 'optimized' in profile.decode('utf-8'):
+		print("Running optimized profile")
+	else:
+		print("Configuring optimized profile")
+		subprocess.run(['./ns3', 'configure', '--build-profile=optimized', '--out=build/optimized'])
+
+def execute_simulation(run_map, currentIteration):
+	config = " ".join([f"--{key}={value} " for key, value in run_map.items()])
+
+	print(config)
+	exit(0)
 	
 	result = subprocess.run(
-		["./ns3", "run", '"scratch/handover-ns3-works/scenario/scenario.cc ' + config + '"'],
+		["./ns3", "run", '"scratch/handover-ns3-works/scenario/scenario.cc' + config + '"'],
 		capture_output=True, text=True
 	)
 	output = result.stdout
@@ -82,95 +206,25 @@ def execute_simulation(ttt, hys, servingCellThreshold, neighbourCellOffset, spee
 
 			imsi_states[imsi] = state
 	
-	# enb coordinates formatted like (1, 3, 4), (2, 4, 5)
-	it = iter(enbCoordinates)
-	enbCoordinatesOutputString = list(zip(it, it, it))
-	return {
-		"ttt": ttt,
-		"hys": hys,
-		"servingCellThreshold": servingCellThreshold,
-		"neighbourCellOffset": neighbourCellOffset,
-		"speed": speed,
-		"angle": angle,
-		"Qout": q_out,
-		"Qin": q_in,
-		"T310": t_310,
-		"N310": n_310,
-		"N311": n_311,
-		"fading_model": FadingModel(fading_model).name,
-		"handover_algorithm": Handover(handover_algorithm).name,
-		"enbCoordinates": enbCoordinatesOutputString,
-		"output": output, 
+	# add the output values to the map
+	run_map.update({
+		"currentIteration": currentIteration,
+		"output": output,
 		"stderr": result.stderr,
-		"rlf_count": rlf_count, 
+		"rlf_count": rlf_count,
 		"handover_count": ho_count,
-		"hof_command": hof_com, 
+		"hof_command": hof_com,
 		"hof_ttt": hof_ttt,
 		"hof_total": hof_ttt + hof_com,
-	}
+	})
+	
+	return run_map
 		
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description="Command line argument parser")
-	parser.add_argument('run_name', type=str, help='Run Name')
-	# parser.add_argument('--ttt', action='store_true', help='Vary ttt')
-	# parser.add_argument('--hys', action='store_true', help='Vary hys')
-	# parser.add_argument('--speed', action='store_true', help='Vary speed')
-	# parser.add_argument('--angle', action='store_true', help='Vary angle')
-	# parser.add_argument('--Qout', action='store_true', help='Vary Qout')
-	# parser.add_argument('--Qin', action='store_true', help='Vary Qin')
-	# parser.add_argument('--T310', action='store_true', help='Vary T310')
-	# parser.add_argument('--N310', action='store_true', help='Vary N310')
-	# parser.add_argument('--N311', action='store_true', help='Vary N311')
-	args = parser.parse_args()
+	run_name, out_dir, debug, config_map = parse_args()
 	
-	out_dir = "./"
-	run_name = args.run_name
-	
-	# Default run values, change if needed
-	ttt = [256]
-	hys = [3]
-	servingCellThreshold = [30]
-	neighbourCellOffset = [1]
-	speed = [20]
-	angle = [0]
-	Qout = [-5]
-	Qin = [-3.9]
-	T310 = [1000]
-	N310 = [6]
-	N311 = [2]	
-	fading_model = [FadingModel.DETERMINISTIC]
-	handover_algorithm = [Handover.A3_RSRP]
-	# Each array element is a input for one simulation run
-	# Group of three coords is one eNB
-	enbCoordinates = [[0, 0, 0, 100, 0, 0]]
-	
-	# Testing params
-	# Uncomment the params that you want to vary
-	# ttt = [0, 40, 64, 80, 100, 128, 160, 256, 320, 480, 512, 640, 1024, 1280, 2560, 5120]
-	# hys = [0.5*i for i in range(0, 31)]
-	# servingCellThreshold = [i for i in range(0, 34)]
-	# neighbourCellOffset = [i for i in range(0, 34)]
-	# speed = list(range(10, 101, 10))
-	# angle = list(range(10, 91, 10))
-	# Qout = [-6 + 0.5*i for i in range(0, 13)]
-	# Qin = [-4 + 0.5*i for i in range(0, 17)]
-	# T310 = [0, 50, 100, 200, 500, 1000, 2000]
-	# N310 = [1, 2, 3, 4, 6, 8, 10, 20]
-	# N311 = [1, 2, 3, 4, 5, 6, 8, 10]
-	# 0 = Deterministic, 1 = Rayleigh, 2 = Correlated
-	# fading_model = [FadingModel.RAYLEIGH, FadingModel.CORRELATED]
-	# handover_algorithm = [Handover.A2A4_RSRQ]
-	# enbCoordinates = [[0, 0, 0, 100, 0, 0], [0, 0, 0, 100, 0, 0, 200, 0, 0]]
-		
-	# number of iterations to run for each configuration
-	# iterationsPerConfig = 1
-
-	profile = subprocess.check_output(['./ns3', 'show', 'profile'])
-	if 'optimized' in profile.decode('utf-8'):
-		print("Running optimized profile")
-	else:
-		print("Configuring optimized profile")
-		subprocess.run(['./ns3', 'configure', '--build-profile=optimized', '--out=build/optimized'])
+	if not debug:
+		configure_optimized()
 	
 	print("Building NS-3")
 	subprocess.run(['./ns3', 'build'])
@@ -178,28 +232,53 @@ if __name__ == "__main__":
 	with ProcessPoolExecutor() as executor:
 		sims = []
 
-		for run_values in list(product(ttt, hys, servingCellThreshold, neighbourCellOffset, speed, angle, Qout, Qin, T310, N310, N311, fading_model, handover_algorithm, enbCoordinates)):
-			sims.append(executor.submit(execute_simulation, *run_values))	
+		# run the simulations
+		for i in range(config_map["iterationsPerConfig"]["values"][0]):
+			
+			# get a list of all possible combinations of the config_map values
+			# only the ones not marked as ignoreNs3Arg
+			for run_values in list(product(*[value for value in config_map.values()])):
+				# create a map of the config_map keys to the run_values
+				# run_map = {key: value for key, value in zip(config_map.keys(), run_values)}
+				# use the convertToValue function if it exists
+				print(run_values)
+				run_map = {}
+				for key, value in zip(config_map.keys(), run_values):
+					if value.get("ignoreNs3Arg", False) == False:
+						run_map[key] = (value["convertToValue"](value) if "convertToValue" in value else value["value"])
+				print(run_map)
+				# run the simulation
+				sims.append(executor.submit(execute_simulation, run_map, i))	
 
-		# results = [future.result() for future in sims]
+		# wait for the simulations to finish
 		results = [future.result() for future in tqdm(sims, desc="Processing simulations")]
 
 		# Filter out failed executions
 		results = [item for item in results if item is not None]
 
 		try:
+			# Check if the output directory exists, if not create it
+			os.makedirs(out_dir, exist_ok=True)
+			
+			# write the results to a json file
 			with open(f'{out_dir}{run_name}.json', 'w', encoding='utf-8') as json_file:
 				json.dump(results, json_file, ensure_ascii=False, indent=2)
 
-			keys_to_include = ['ttt', 'hys', 'servingCellThreshold', 'neighbourCellOffset', 'speed', 'angle', 'Qout', 'Qin', 'T310', 'N310', 'N311', 'fading_model', 'handover_algorithm', 'enbCoordinates', 'handover_count', 'rlf_count', 'hof_command', 'hof_ttt', 'hof_total']
+			# check which columns to include
+			keys_to_include = [key for key in config_map.keys() if key not in config_map["ignoreNs3Arg"]["values"]]
+			
+			# write the results to a csv file
 			with open(f'{out_dir}{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:
+					# Create a DictWriter object with the specified fieldnames
 					writer = csv.DictWriter(csv_file, fieldnames=keys_to_include)
-
 					writer.writeheader()
+					
+					# Write the rows to the CSV file
 					for item in results:
 							# Filtering the dictionary to only include the specified keys
 							row = {key: item[key] for key in keys_to_include}
 							writer.writerow(row)
+							
 		except Exception as e:
 			print(e)
 			print(results)

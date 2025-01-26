@@ -137,6 +137,8 @@ main(int argc, char* argv[])
 		double fadingModel = 0;
 		// 0 = A3, 1 = A2A4
 		double handoverAlgorithm = 0;
+		
+		std::string enbCoordinates = "0,0,0,100,0,0";
 
     // change some default attributes so that they are reasonable for
     // this scenario, but do this before processing command line
@@ -148,6 +150,8 @@ main(int argc, char* argv[])
     // Command line arguments
     CommandLine cmd(__FILE__);
     cmd.AddValue("simTime", "Total duration of the simulation (in seconds)", simTime);
+		cmd.AddValue("enbCoordinates", "Positive coordinates of the eNBs (in format x0,y0,z0,x1,y1,z1 ...)", enbCoordinates);
+		cmd.AddValue("numberOfEnbs", "Number of eNBs (default = 2)", numberOfEnbs);
     cmd.AddValue("speed", "Speed of the UE (default = 20 m/s)", speed);
     cmd.AddValue("enbTxPowerDbm", "TX power [dBm] used by HeNBs (default = 46.0)", enbTxPowerDbm);
     cmd.AddValue("hysteresis",
@@ -240,11 +244,23 @@ main(int argc, char* argv[])
     enbNodes.Create(numberOfEnbs);
     ueNodes.Create(numberOfUes);
 
+		// split the string into tokens and store the values in a vector
+		std::vector<std::string> enbCoord;
+		std::stringstream ss(enbCoordinates);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        enbCoord.push_back(token);
+    }
+		std::cout << "Coordinates of the eNBs: " << std::endl;
+		for( int i = 0; i < enbCoord.size(); i++ ) {
+			std::cout << enbCoord[i] << " ";
+		}
+		
     // Install Mobility Model in eNB
     Ptr<ListPositionAllocator> enbPositionAlloc = CreateObject<ListPositionAllocator>();
     for (uint16_t i = 0; i < numberOfEnbs; i++)
     {
-        Vector enbPosition(distance * (i), 0, 0);
+        Vector enbPosition = Vector(atoi(enbCoord[i*3].c_str()), atoi(enbCoord[i*3+1].c_str()), atoi(enbCoord[i*3+2].c_str()));
         enbPositionAlloc->Add(enbPosition);
     }
 

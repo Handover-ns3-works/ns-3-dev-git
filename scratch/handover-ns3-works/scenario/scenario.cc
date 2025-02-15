@@ -151,7 +151,6 @@ main(int argc, char* argv[])
     CommandLine cmd(__FILE__);
     cmd.AddValue("simTime", "Total duration of the simulation (in seconds)", simTime);
 		cmd.AddValue("enbCoordinates", "Positive coordinates of the eNBs (in format x0,y0,z0,x1,y1,z1 ...)", enbCoordinates);
-		cmd.AddValue("numberOfEnbs", "Number of eNBs (default = 2)", numberOfEnbs);
     cmd.AddValue("speed", "Speed of the UE (default = 20 m/s)", speed);
     cmd.AddValue("enbTxPowerDbm", "TX power [dBm] used by HeNBs (default = 46.0)", enbTxPowerDbm);
     cmd.AddValue("hysteresis",
@@ -174,6 +173,7 @@ main(int argc, char* argv[])
 
     cmd.Parse(argc, argv);
     double angleInRadians = angleInDegrees * M_PI / 180.0;
+		numberOfEnbs = enbCoordinates.size() / 3;
 
     Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
     Ptr<PointToPointEpcHelper> epcHelper = CreateObject<PointToPointEpcHelper>();

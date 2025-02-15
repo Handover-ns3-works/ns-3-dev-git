@@ -17,8 +17,9 @@ class Handover(Enum):
 	A3_RSRP = 0
 	A2A4_RSRQ = 1
 
-def execute_simulation(ttt, hys, servingCellThreshold, neighbourCellOffset, speed, angle, q_out, q_in, t_310, n_310, n_311, fading_model, handover_algorithm):
-	config = f"--timeToTrigger={ttt} --hysteresis={hys} --servingCellThreshold={servingCellThreshold} --neighbourCellOffset={neighbourCellOffset} --speed={speed} --angle={angle}--Qout={q_out} --Qin={q_in} --T310={t_310} --N310={n_310} --N311={n_311} --fadingModel={fading_model.value} --handoverAlgorithm={handover_algorithm.value}"
+def execute_simulation(ttt, hys, servingCellThreshold, neighbourCellOffset, speed, angle, q_out, q_in, t_310, n_310, n_311, fading_model, handover_algorithm, enbCoordinates):
+	enbCoordinatesString = ",".join([str(x) for x in enbCoordinates])
+	config = f"--timeToTrigger={ttt} --hysteresis={hys} --servingCellThreshold={servingCellThreshold} --neighbourCellOffset={neighbourCellOffset} --speed={speed} --angle={angle}--Qout={q_out} --Qin={q_in} --T310={t_310} --N310={n_310} --N311={n_311} --fadingModel={fading_model.value} --handoverAlgorithm={handover_algorithm.value} --enbCoordinates={enbCoordinatesString}"
 	
 	# This requires handling of batch results
 	# for j in range(1, iterationsPerConfig+1):
@@ -81,6 +82,9 @@ def execute_simulation(ttt, hys, servingCellThreshold, neighbourCellOffset, spee
 
 			imsi_states[imsi] = state
 	
+	# enb coordinates formatted like (1, 3, 4), (2, 4, 5)
+	it = iter(enbCoordinates)
+	enbCoordinatesOutputString = list(zip(it, it, it))
 	return {
 		"ttt": ttt,
 		"hys": hys,
@@ -95,6 +99,7 @@ def execute_simulation(ttt, hys, servingCellThreshold, neighbourCellOffset, spee
 		"N311": n_311,
 		"fading_model": FadingModel(fading_model).name,
 		"handover_algorithm": Handover(handover_algorithm).name,
+		"enbCoordinates": enbCoordinatesOutputString,
 		"output": output, 
 		"stderr": result.stderr,
 		"rlf_count": rlf_count, 
@@ -135,6 +140,9 @@ if __name__ == "__main__":
 	N311 = [2]	
 	fading_model = [FadingModel.DETERMINISTIC]
 	handover_algorithm = [Handover.A3_RSRP]
+	# Each array element is a input for one simulation run
+	# Group of three coords is one eNB
+	enbCoordinates = [[0, 0, 0, 100, 0, 0]]
 	
 	# Testing params
 	# Uncomment the params that you want to vary
@@ -152,6 +160,7 @@ if __name__ == "__main__":
 	# 0 = Deterministic, 1 = Rayleigh, 2 = Correlated
 	# fading_model = [FadingModel.RAYLEIGH, FadingModel.CORRELATED]
 	# handover_algorithm = [Handover.A2A4_RSRQ]
+	# enbCoordinates = [[0, 0, 0, 100, 0, 0], [0, 0, 0, 100, 0, 0, 200, 0, 0]]
 		
 	# number of iterations to run for each configuration
 	# iterationsPerConfig = 1
@@ -169,7 +178,7 @@ if __name__ == "__main__":
 	with ProcessPoolExecutor() as executor:
 		sims = []
 
-		for run_values in list(product(ttt, hys, servingCellThreshold, neighbourCellOffset, speed, angle, Qout, Qin, T310, N310, N311, fading_model, handover_algorithm)):
+		for run_values in list(product(ttt, hys, servingCellThreshold, neighbourCellOffset, speed, angle, Qout, Qin, T310, N310, N311, fading_model, handover_algorithm, enbCoordinates)):
 			sims.append(executor.submit(execute_simulation, *run_values))	
 
 		# results = [future.result() for future in sims]
@@ -182,7 +191,7 @@ if __name__ == "__main__":
 			with open(f'{out_dir}{run_name}.json', 'w', encoding='utf-8') as json_file:
 				json.dump(results, json_file, ensure_ascii=False, indent=2)
 
-			keys_to_include = ['ttt', 'hys', 'servingCellThreshold', 'neighbourCellOffset', 'speed', 'angle', 'Qout', 'Qin', 'T310', 'N310', 'N311', 'fading_model', 'handover_algorithm', 'handover_count', 'rlf_count', 'hof_command', 'hof_ttt', 'hof_total']
+			keys_to_include = ['ttt', 'hys', 'servingCellThreshold', 'neighbourCellOffset', 'speed', 'angle', 'Qout', 'Qin', 'T310', 'N310', 'N311', 'fading_model', 'handover_algorithm', 'enbCoordinates', 'handover_count', 'rlf_count', 'hof_command', 'hof_ttt', 'hof_total']
 			with open(f'{out_dir}{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:
 					writer = csv.DictWriter(csv_file, fieldnames=keys_to_include)
 

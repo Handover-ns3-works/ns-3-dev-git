@@ -113,7 +113,7 @@ CourseChangeCallback(std::string context, Ptr<const MobilityModel> model)
 {
 	Vector position = model->GetPosition();
 	std::cout << Simulator::Now().GetSeconds() << " Position: " <<	context <<
-		" x = " << position.x << ", y = " << position.y;
+		" x = " << position.x << ", y = " << position.y << std::endl;
 }
 
 /**

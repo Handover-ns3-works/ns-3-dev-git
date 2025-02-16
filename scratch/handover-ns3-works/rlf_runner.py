@@ -166,7 +166,7 @@ def configure_optimized():
 
 def execute_simulation(run_map, currentIteration):
 	config = " ".join([f"--{key}={value} " for key, value in run_map.items()])
-	print(config)
+
 	result = subprocess.run(
 		["./ns3", "run", '"scratch/handover-ns3-works/scenario/scenario.cc ' + config + '"'],
 		capture_output=True, text=True

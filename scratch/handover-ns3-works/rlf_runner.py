@@ -155,10 +155,16 @@ def parse_args():
 	
 	return run_config, ns3_config
 
-def configure_optimized():
+def configure_ns3(debug):
 	# Check if we are running the optimized profile
 	profile = subprocess.check_output(['./ns3', 'show', 'profile'])
-	if 'optimized' in profile.decode('utf-8'):
+	if debug:
+		if 'debug' in profile.decode('utf-8'):
+			print("Running debug profile")
+		else:
+			print("Configuring debug profile")
+			subprocess.run(['./ns3', 'configure', '--build-profile=debug', '--out=build'])
+	elif 'optimized' in profile.decode('utf-8'):
 		print("Running optimized profile")
 	else:
 		print("Configuring optimized profile")
@@ -242,8 +248,7 @@ if __name__ == "__main__":
 	run_name = run_config["run_name"]
 	out_dir = run_config["out_dir"]
 	
-	if not run_config["debug"]:
-		configure_optimized()
+	configure_ns3(run_config["debug"])
 	
 	print("Building NS-3")
 	subprocess.run(['./ns3', 'build'])
@@ -269,6 +274,9 @@ if __name__ == "__main__":
 
 		# Filter out failed executions
 		results = [item for item in results if item is not None]
+		succeeded = len([item for item in results if item.get("stderr", "") == ""])
+		
+		print(f"Total: \033[36m{len(results)}\033[0m, Successful: \033[32m{succeeded}\033[0m, Failed: \033[31m{len(results) - succeeded}\033[0m")
 
 		try:
 			# Check if the output directory exists, if not create it
@@ -284,7 +292,7 @@ if __name__ == "__main__":
 				json.dump(json_output, json_file, ensure_ascii=False, indent=2)
 
 			# check which columns to include
-			keys_to_include = [key for key in ns3_config.keys() if key not in run_config["ignoreColumnOutput"]]
+			keys_to_include = [key for key in {**ns3_config, **run_config}.keys() if key not in run_config["ignoreColumnOutput"]]
 			
 			# write the results to a csv file
 			with open(f'./{out_dir}/{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:

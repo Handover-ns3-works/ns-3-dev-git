@@ -4,6 +4,7 @@ import json
 import csv
 import subprocess
 import argparse
+import traceback
 from tqdm import tqdm
 from concurrent.futures.process import ProcessPoolExecutor
 from itertools import product
@@ -98,6 +99,31 @@ def parse_args():
 			"type": "str",
 			"values": ["0,0,0,100,0,0"],
 			"help": "Vary the eNB coordinates in x,y,z. Each space separated string is one config. Default: 0,0,0,100,0,0. Example: --enbCoordinatesString 0,0,0,100,0,0 0,50,0,0,0,170",
+		},
+		"useRandomWaypoint": {
+			"type": "int",
+			"values": [0],
+			"help": "Controls the use of random waypoint mobility model for UEs. Default: False. Example: --useRandomWaypoint 1",
+		},
+		"randomRectanglePositionAllocatorXMax": {
+			"type": "int",
+			"values": [300],
+			"help": "Vary the maximum value for the UniformRandomVariable. Default: 300. Example: --randomRectanglePositionAllocatorXMax 100 200 300 400 500",
+		},
+		"randomRectanglePositionAllocatorYMax": {
+			"type": "int",
+			"values": [1500],
+			"help": "Vary the maximum value for the UniformRandomVariable. Default: 300. Example: --randomRectanglePositionAllocatorYMax 100 200 300 400 500",
+		},
+		"randomWaypointMobilityModelSpeed": {
+			"type": "int",
+			"values": [20],
+			"help": "Vary the speed in m/s. Default: 20. Example: --randomWaypointMobilityModelSpeed 10 20 30 40 50",
+		},
+		"randomWaypointMobilityModelPause": {
+			"type": "int",
+			"values": [0],
+			"help": "Vary the pause time in seconds. Default: 1. Example: --randomWaypointMobilityModelPause 0 1 2 3 4 5",
 		},
 	}
 	
@@ -292,7 +318,7 @@ if __name__ == "__main__":
 				json.dump(json_output, json_file, ensure_ascii=False, indent=2)
 
 			# check which columns to include
-			keys_to_include = [key for key in {**ns3_config, **run_config}.keys() if key not in run_config["ignoreColumnOutput"]]
+			keys_to_include = [key for key in ns3_config.keys() if key not in run_config["ignoreColumnOutput"]]
 			
 			# write the results to a csv file
 			with open(f'./{out_dir}/{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:
@@ -307,6 +333,7 @@ if __name__ == "__main__":
 							writer.writerow(row)
 							
 		except Exception as e:
+			traceback.print_exc()
 			print(e)
 			print(results)
 		

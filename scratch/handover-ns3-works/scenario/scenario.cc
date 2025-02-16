@@ -108,6 +108,14 @@ NotifyHandoverFailure(std::string context, uint64_t imsi, uint16_t cellid, uint1
               << " IMSI " << imsi << " RNTI " << rnti << " handover failure" << std::endl;
 }
 
+void
+CourseChangeCallback(std::string context, Ptr<const MobilityModel> model)
+{
+	Vector position = model->GetPosition();
+	std::cout << Simulator::Now().GetSeconds() << " Position: " <<	context <<
+		" x = " << position.x << ", y = " << position.y;
+}
+
 /**
  * Sample simulation script for an automatic X2-based handover based on the RSRQ measures.
  * It instantiates two eNodeB, attaches one UE to the 'source' eNB.
@@ -137,6 +145,10 @@ main(int argc, char* argv[])
 		double fadingModel = 0;
 		// 0 = A3, 1 = A2A4
 		double handoverAlgorithm = 0;
+		
+		uint16_t useRandomWaypoint = 0;
+		double XMax = 300.0, YMax = 1500.0;
+		double nodeSpeed = 20, nodePause = 0;
 		
 		std::string enbCoordinatesString = "0,0,0,100,0,0";
 
@@ -170,6 +182,12 @@ main(int argc, char* argv[])
 		cmd.AddValue("N311", "N311 value for lte-ue-phy (default = 2)", N311);
 		cmd.AddValue("fadingModel", "Fading model to be used (default = DETERMINISTIC)", fadingModel);
 		cmd.AddValue("handoverAlgorithm", "Handover algorithm to be used (default = A3)", handoverAlgorithm);
+		
+		cmd.AddValue("useRandomWaypoint", "Use Random Waypoint Mobility Model for UE", useRandomWaypoint);
+		cmd.AddValue("randomRectanglePositionAllocatorXMax", "The maximum value for the UniformRandomVariable for X", XMax);
+		cmd.AddValue("randomRectanglePositionAllocatorYMax", "The maximum value for the UniformRandomVariable for Y", YMax);
+		cmd.AddValue("randomWaypointMobilityModelSpeed", "Max speed value for UniformRandomVariable", nodeSpeed);
+		cmd.AddValue("randomWaypointMobilityModelPause", "Max pause value for UniformRandomVariable", nodePause);
 
     cmd.Parse(argc, argv);
     double angleInRadians = angleInDegrees * M_PI / 180.0;
@@ -266,16 +284,42 @@ main(int argc, char* argv[])
 
     // Install Mobility Model in UE
     MobilityHelper ueMobility;
-    ueMobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
-    ueMobility.Install(ueNodes);
-    for (uint16_t i = 0; i < numberOfUes; i++)
-    {
-        double vx = speed * std::cos(angleInRadians);
-        double vy = speed * std::sin(angleInRadians);
-        ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(
-            Vector(0, Ue_ycoord[i], 0));
-        ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(vx, vy, 0));
-    }
+		if( useRandomWaypoint == 1 ) {
+			int64_t streamIndex = 0; // used to get consistent mobility across scenarios
+			ObjectFactory pos;
+			pos.SetTypeId("ns3::RandomRectanglePositionAllocator");
+			pos.Set("X", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=" + std::to_string(XMax) + "]"));
+			pos.Set("Y", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=" + std::to_string(YMax) + "]"));
+
+			Ptr<PositionAllocator> taPositionAlloc = pos.Create()->GetObject<PositionAllocator>();
+			streamIndex += taPositionAlloc->AssignStreams(streamIndex);
+
+			std::stringstream ssSpeed;
+			ssSpeed << "ns3::UniformRandomVariable[Min=0.0|Max=" << nodeSpeed << "]";
+			std::stringstream ssPause;
+			ssPause << "ns3::ConstantRandomVariable[Constant=" << nodePause << "]";
+			ueMobility.SetMobilityModel("ns3::RandomWaypointMobilityModel",
+																		"Speed",
+																		StringValue(ssSpeed.str()),
+																		"Pause",
+																		StringValue(ssPause.str()),
+																		"PositionAllocator",
+																		PointerValue(taPositionAlloc));
+			ueMobility.SetPositionAllocator(taPositionAlloc);
+			ueMobility.Install(ueNodes);
+			streamIndex += ueMobility.AssignStreams(ueNodes, streamIndex);
+		} else {
+			ueMobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
+			ueMobility.Install(ueNodes);
+			for (uint16_t i = 0; i < numberOfUes; i++)
+			{
+					double vx = speed * std::cos(angleInRadians);
+					double vy = speed * std::sin(angleInRadians);
+					ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetPosition(
+							Vector(0, Ue_ycoord[i], 0));
+					ueNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>()->SetVelocity(Vector(vx, vy, 0));
+			}
+		}
 
     // Install LTE Devices in eNB and UEs
     // lteHelper->SetEnbDeviceAttribute("DlEarfcn", UintegerValue (6250));
@@ -398,6 +442,8 @@ main(int argc, char* argv[])
                     MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
+		// Config::Connect("/NodeList/*/$ns3::MobilityModel/CourseChange",
+		// 								MakeCallback(&CourseChangeCallback));
 
     // Hook a trace sink (the same one) to the four handover failure traces
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",

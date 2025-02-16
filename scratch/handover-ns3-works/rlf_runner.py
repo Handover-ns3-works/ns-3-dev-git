@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import csv
 import subprocess
@@ -20,23 +21,11 @@ class HandoverAlgorithmType(Enum):
 
 def parse_args():
 	# Default run values, change if needed	
-	config_map = {
+	ns3_config_map = {
 		"simTime": {
 			"type": "float",
 			"values": [15],
 			"help": "Vary the simulation time in seconds. Default: 15. Example: --simTime 10 15 20 30 60",
-		},
-		"iterationsPerConfig": {
-			"type": "int",
-			"values": 1,
-			"ignoreNs3Arg": True,
-			"help": "Vary the number of iterations per configuration. Default: 1. Example: --iterationsPerConfig 5",			
-		},
-		"ignoreColumnOutput": {
-			"type": "str",
-			"values": [],
-			"ignoreNs3Arg": True,
-			"help": "Ignore the column output. Default: []. Example: --ignoreColumnOutput hysterisis servingCellThreshold",
 		},
 		"timeToTrigger": {
 			"type": "int",
@@ -105,35 +94,66 @@ def parse_args():
 			"convertToValue": lambda x: x.value,
 			"help": "Vary the handover algorithm. Default: A3_RSRP. Example: --handoverAlgorithm A3_RSRP A2A4_RSRQ",
 		},
+		"enbCoordinatesString": {
+			"type": "str",
+			"values": ["0,0,0,100,0,0"],
+			"help": "Vary the eNB coordinates in x,y,z. Each space separated string is one config. Default: 0,0,0,100,0,0. Example: --enbCoordinatesString 0,0,0,100,0,0 0,50,0,0,0,170",
+		},
+	}
+	
+	run_config_map = {
+		"out_dir": {
+			"type": "str",
+			"value": "./outputs/",
+			"help": "Output directory",
+		},
+		"debug": {
+			"type": "bool",
+			"value": False,
+			"help": "Debug mode",
+		},
+		"iterationsPerConfig": {
+			"type": "int",
+			"value": 1,
+			"help": "Vary the number of iterations per configuration. Default: 1. Example: --iterationsPerConfig 5",
+		},
+		"ignoreColumnOutput": {
+			"type": "str",
+			"value": [],
+			"help": "Ignore the column output. Default: []. Example: --ignoreColumnOutput hysterisis servingCellThreshold",
+		},
 	}
 	
 	parser = argparse.ArgumentParser(description="Command line argument parser")
 	parser.add_argument('run_name', type=str, help='Run Name')
-	parser.add_argument('-o', '--out_dir', type=str, help='Output directory', default="./results/")
-	parser.add_argument('-d', '--debug', action='store_true', help='Debug mode', default=False)
-	for key, value in config_map.items():
+		
+	# combine the run_config and config_map arguments
+	for key, value in {**run_config_map, **ns3_config_map}.items():
 		parser.add_argument(
 			f'--{key}', 
 			type=eval(value["type"]),
-			nargs='*' if isinstance(value["values"], list) else None,
-			default=value["values"],
+			nargs='*' if isinstance(value.get("values", None), list) or isinstance(value.get("value", None), list) else None,
+			default=value["values"] if key in ns3_config_map.keys() else value["value"],
 			help=value["help"]
 		)
 	
 	args = parser.parse_args()
-	# map the args to values in config_map
+	run_config = {}
+	ns3_config = {}
+	run_config["run_name"] = args.run_name
+	run_config["run_command"] = " ".join(sys.argv)
+	# map the args to values in ns3_config and run_config
 	for key, value in args.__dict__.items():
-			# ignore the run_name and out_dir
-			if key not in config_map:
-					continue
-			
-			# itertools.product doesn't work with non-iterables
-			if not isinstance(value, list):
-					value = [value]
-					
-			config_map[key]["values"] = value
+		if key == "run_name":
+			continue
+		elif key in run_config_map.keys():
+			run_config[key] = value
+		elif "convertToValue" in ns3_config_map[key]:
+			ns3_config[key] = [ns3_config_map[key]["convertToValue"](x) for x in value]
+		else:
+			ns3_config[key] = value
 	
-	return args.run_name, args.out_dir, args.debug, config_map
+	return run_config, ns3_config
 
 def configure_optimized():
 	# Check if we are running the optimized profile
@@ -146,12 +166,9 @@ def configure_optimized():
 
 def execute_simulation(run_map, currentIteration):
 	config = " ".join([f"--{key}={value} " for key, value in run_map.items()])
-
 	print(config)
-	exit(0)
-	
 	result = subprocess.run(
-		["./ns3", "run", '"scratch/handover-ns3-works/scenario/scenario.cc' + config + '"'],
+		["./ns3", "run", '"scratch/handover-ns3-works/scenario/scenario.cc ' + config + '"'],
 		capture_output=True, text=True
 	)
 	output = result.stdout
@@ -221,9 +238,11 @@ def execute_simulation(run_map, currentIteration):
 	return run_map
 		
 if __name__ == "__main__":
-	run_name, out_dir, debug, config_map = parse_args()
+	run_config, ns3_config = parse_args()
+	run_name = run_config["run_name"]
+	out_dir = run_config["out_dir"]
 	
-	if not debug:
+	if not run_config["debug"]:
 		configure_optimized()
 	
 	print("Building NS-3")
@@ -233,20 +252,15 @@ if __name__ == "__main__":
 		sims = []
 
 		# run the simulations
-		for i in range(config_map["iterationsPerConfig"]["values"][0]):
+		for i in range(run_config["iterationsPerConfig"]):
 			
-			# get a list of all possible combinations of the config_map values
-			# only the ones not marked as ignoreNs3Arg
-			for run_values in list(product(*[value for value in config_map.values()])):
-				# create a map of the config_map keys to the run_values
-				# run_map = {key: value for key, value in zip(config_map.keys(), run_values)}
-				# use the convertToValue function if it exists
-				print(run_values)
+			# get a list of all possible combinations of the ns3_config values
+			for run_values in list(product(*[value for value in ns3_config.values()])):
+				# create a map of the ns3_config keys and the run_values
 				run_map = {}
-				for key, value in zip(config_map.keys(), run_values):
-					if value.get("ignoreNs3Arg", False) == False:
-						run_map[key] = (value["convertToValue"](value) if "convertToValue" in value else value["value"])
-				print(run_map)
+				for key, value in zip(ns3_config.keys(), run_values):
+					run_map[key] = value
+					
 				# run the simulation
 				sims.append(executor.submit(execute_simulation, run_map, i))	
 
@@ -261,14 +275,19 @@ if __name__ == "__main__":
 			os.makedirs(out_dir, exist_ok=True)
 			
 			# write the results to a json file
-			with open(f'{out_dir}{run_name}.json', 'w', encoding='utf-8') as json_file:
-				json.dump(results, json_file, ensure_ascii=False, indent=2)
+			with open(f'./{out_dir}/{run_name}.json', 'w', encoding='utf-8') as json_file:
+				# Enrich the command for easy replication
+				json_output = {
+					"run_command": run_config["run_command"],
+					"results": results
+				}
+				json.dump(json_output, json_file, ensure_ascii=False, indent=2)
 
 			# check which columns to include
-			keys_to_include = [key for key in config_map.keys() if key not in config_map["ignoreNs3Arg"]["values"]]
+			keys_to_include = [key for key in ns3_config.keys() if key not in run_config["ignoreColumnOutput"]]
 			
 			# write the results to a csv file
-			with open(f'{out_dir}{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:
+			with open(f'./{out_dir}/{run_name}.csv', 'w', newline='', encoding='utf-8') as csv_file:
 					# Create a DictWriter object with the specified fieldnames
 					writer = csv.DictWriter(csv_file, fieldnames=keys_to_include)
 					writer.writeheader()

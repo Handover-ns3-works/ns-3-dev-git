@@ -442,8 +442,8 @@ main(int argc, char* argv[])
                     MakeCallback(&NotifyHandoverEndOkUe));
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/RadioLinkFailure",
                     MakeCallback(&RadioLinkFailureCallback));
-		// Config::Connect("/NodeList/*/$ns3::MobilityModel/CourseChange",
-		// 								MakeCallback(&CourseChangeCallback));
+		Config::Connect("/NodeList/*/$ns3::MobilityModel/CourseChange",
+										MakeCallback(&CourseChangeCallback));
 
     // Hook a trace sink (the same one) to the four handover failure traces
     // Config::Connect("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverFailureNoPreamble",

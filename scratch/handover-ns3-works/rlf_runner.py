@@ -205,6 +205,13 @@ def execute_simulation(run_map, currentIteration):
 	)
 	output = result.stdout
 	
+	# Extract the UE position output lines
+	ue_positions = set([x for x in output.split('\n') if 'Position' in x])
+	# Extract the UE positions from the output
+	# 8.48354 Position: /NodeList/7/$ns3::MobilityModel/CourseChange x = 24.8571, y = 24.4631
+	# 8.48354, 7, 24.8571, 24.4631
+	ue_positions_csv = [x.split()[0] + ", " + x.split("/")[2].split("/")[0] + ", " + x.split("x = ")[1].split(",")[0] + ", " + x.split("y = ")[1] for x in ue_positions]
+	
 	# RNTIs where the Handover command was recieved when T310 timer was running
 	# Supposed to be reported as a HOF, but NS-3 is configured with an Ideal RRC, so it doesn't happen
 	# This needs to be subtracted from number of HOs, to give actual number of Handovers
@@ -260,6 +267,7 @@ def execute_simulation(run_map, currentIteration):
 		"currentIteration": currentIteration,
 		"output": output,
 		"stderr": result.stderr,
+		"ue_positions_csv": ue_positions_csv,
 		"rlf_count": rlf_count,
 		"handover_count": ho_count,
 		"hof_command": hof_com,
@@ -331,6 +339,14 @@ if __name__ == "__main__":
 							# Filtering the dictionary to only include the specified keys
 							row = {key: item[key] for key in keys_to_include}
 							writer.writerow(row)
+			
+			# write the UE positions to a csv file
+			with open(f'./{out_dir}/{run_name}_ue_positions.csv', 'w', newline='', encoding='utf-8') as csv_file:
+					writer = csv.writer(csv_file)
+					writer.writerow(["Time", "Node ID", "X", "Y"])
+					for item in results:
+							for row in item["ue_positions_csv"]:
+									writer.writerow(row.split(", "))
 							
 		except Exception as e:
 			traceback.print_exc()

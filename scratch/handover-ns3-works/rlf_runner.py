@@ -8,17 +8,6 @@ import traceback
 from tqdm import tqdm
 from concurrent.futures.process import ProcessPoolExecutor
 from itertools import product
-from enum import Enum
-
-# enum
-class FadingModel(Enum):
-	DETERMINISTIC = 0
-	RAYLEIGH = 1
-	CORRELATED = 2
-	
-class HandoverAlgorithmType(Enum):
-	A3_RSRP = 0
-	A2A4_RSRQ = 1
 
 def parse_args():
 	# Default run values, change if needed	
@@ -84,15 +73,13 @@ def parse_args():
 			"help": "Vary the N311 timer in ms. Default: 2. Example: --N311 1 2 3 4 5 6 8 10",
 		},
 		"fadingModel": {
-			"type": "FadingModel",
-			"values": [FadingModel.DETERMINISTIC],
-			"convertToValue": lambda x: x.value,
+			"type": "int",
+			"values": [0],
 			"help": "Vary the fading model. Default: DETERMINISTIC. Example: --fadingModel DETERMINISTIC RAYLEIGH CORRELATED",
 		},
 		"handoverAlgorithm": {
-			"type": "HandoverAlgorithmType",
-			"values": [HandoverAlgorithmType.A3_RSRP],
-			"convertToValue": lambda x: x.value,
+			"type": "int",
+			"values": [0],
 			"help": "Vary the handover algorithm. Default: A3_RSRP. Example: --handoverAlgorithm A3_RSRP A2A4_RSRQ",
 		},
 		"enbCoordinatesString": {
@@ -210,7 +197,7 @@ def execute_simulation(run_map, currentIteration):
 	# Extract the UE positions from the output
 	# 8.48354 Position: /NodeList/7/$ns3::MobilityModel/CourseChange x = 24.8571, y = 24.4631
 	# 8.48354, 7, 24.8571, 24.4631
-	ue_positions_csv = [x.split()[0] + ", " + x.split("/")[2].split("/")[0] + ", " + x.split("x = ")[1].split(",")[0] + ", " + x.split("y = ")[1] for x in ue_positions]
+	ue_positions_csv = [x.split()[0] + "," + x.split("/")[2].split("/")[0] + "," + x.split("x = ")[1].split(",")[0] + "," + x.split("y = ")[1] for x in ue_positions]
 	
 	# RNTIs where the Handover command was recieved when T310 timer was running
 	# Supposed to be reported as a HOF, but NS-3 is configured with an Ideal RRC, so it doesn't happen
@@ -339,14 +326,6 @@ if __name__ == "__main__":
 							# Filtering the dictionary to only include the specified keys
 							row = {key: item[key] for key in keys_to_include}
 							writer.writerow(row)
-			
-			# write the UE positions to a csv file
-			with open(f'./{out_dir}/{run_name}_ue_positions.csv', 'w', newline='', encoding='utf-8') as csv_file:
-					writer = csv.writer(csv_file)
-					writer.writerow(["Time", "Node ID", "X", "Y"])
-					for item in results:
-							for row in item["ue_positions_csv"]:
-									writer.writerow(row.split(", "))
 							
 		except Exception as e:
 			traceback.print_exc()
